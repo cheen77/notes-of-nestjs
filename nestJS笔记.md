@@ -1,4 +1,4 @@
-## 综述
+## 1.综述
 
 `Nestjs` 是一个用于构建高效可扩展的一个基于 `Node js` 服务端 应用程序开发框架
 
@@ -8,7 +8,7 @@ nestjs 还是一个 `spring MVC` 的风格 其中有`依赖注入`, `IOC 控制�
 
 nestjs 的底层代码运用了 express 和 Fastify 在他们的基础上提供了一定程度的抽象，同时也将其 API 直接暴露给开发人员。这样可以轻松使用每个平台的无数第三方模块
 
-## 1-前置知识
+## 2.前置知识
 
 ### AOP 面向切面编程
 
@@ -213,7 +213,11 @@ class Person3 {
 ##### 4.方法装饰器
 
 参数装饰器表达式会在运行时当作函数被调用，
-返回三个参数: 1.原形对象 2.方法的名称 3.属性描述符 可写对应 writable，可枚举对应 enumerable，可配置对应 configurable
+返回三个参数: 1.原形对象 2.方法的名称 3.属性描述符
+function 方法 对应 value
+可写对应 writable
+可枚举对应 enumerable
+可配置对应 configurable
 
 ```
 const decotators4: MethodDecorator = (
@@ -237,3 +241,88 @@ class Person4 {
   }
 }
 ```
+
+### 装饰器实现一个 GET 请求
+
+```
+npm install axios -S
+```
+
+定义控制器 Controller
+
+```
+class Controller {
+    constructor() {
+
+    }
+    getList () {
+
+    }
+
+}
+```
+
+```
+import axios from "axios";
+
+const Get = (url: string): MethodDecorator => { //类似于高阶函数 柯里化处理
+  return (target, key, descriptor: PropertyDescriptor) => {
+    console.log("target", target, "key", key, "descriptor", descriptor.value);
+    const fnc = descriptor.value; //拿到对应的function
+    axios
+      .get(url)
+      .then((res: any) => {
+        fnc(res, {
+          status: 200,
+        });
+      })
+      .catch((e: any) => {
+        fnc(e, {
+          status: 500,
+        });
+      });
+  };
+};
+
+class Controller {
+  constructor() {}
+  @Get("https://api.apiopen.top/api/getHaoKanVideo?page=0&size=10")
+  getList(res: any, status: any) {
+    console.log("res", res, status);
+  }
+}
+
+```
+
+**函数柯里化**
+
+柯里化（Currying）是一种关于函数的高阶技术。
+柯里化是一种函数的转换，它是指将一个函数从可调用的 f(a, b, c) 转换为可调用的 f(a)(b)(c)。
+柯里化不会调用函数。它只是对函数进行转换。
+
+看一个例子
+我们将创建一个辅助函数 curry(f)，该函数将对两个参数的函数 f 执行柯里化。
+换句话说，对于两个参数的函数 f(a, b) 执行 curry(f) 会将其转换为以 f(a)(b) 形式运行的函数：
+
+```
+// 柯里化
+function curry(f: any) {
+  // curry(f) 执行柯里化转换
+  return function (a: any) {
+    return function (b: any) {
+      return f(a, b);
+    };
+  };
+}
+
+// 用法
+function sum(a: any, b: any) {
+  return a + b;
+}
+
+let curriedSum = curry(sum);
+
+console.log(curriedSum(1)(2)); // 3
+```
+
+## 3.nestjs-cli
