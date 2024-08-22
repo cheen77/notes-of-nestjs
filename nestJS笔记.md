@@ -735,3 +735,312 @@ export class DocController {
     }
   }
 ```
+
+## 7.nestjs 提供者
+
+`Providers` 是 `Nest` 的一个基本概念。许多基本的` Nest` 类可能被视为 `provider - service`, `repository`, `factory`, `helper `等等。 他们都可以通过 `constructor `注入依赖关系。 这意味着对象可以彼此创建各种关系，并且“连接”对象实例的功能在很大程度上可以委托给 `Nest` 运行时系统。 `Provider` 只是一个用`@Injectable()`装饰器注释的类。
+
+### 1.基本用法
+
+module 引入 service 在 providers 注入
+
+```
+import { Module } from '@nestjs/common'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { UserController } from './user/user.controller'
+import { UserModule } from './user/user.module'
+import { User2Module } from './user2/user2.module'
+import { DocModule } from './doc/doc.module'
+
+@Module({
+  imports: [UserModule, User2Module, DocModule],
+  controllers: [AppController, UserController],
+  providers: [AppService], //通过Module装饰器注入中间键中
+})
+export class AppModule {}
+```
+
+### 2.service 第二种用法(自定义名称)
+
+```
+import { Module } from '@nestjs/common'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { UserController } from './user/user.controller'
+import { UserModule } from './user/user.module'
+import { User2Module } from './user2/user2.module'
+import { DocModule } from './doc/doc.module'
+
+@Module({
+  imports: [UserModule, User2Module, DocModule],
+  controllers: [AppController, UserController],
+   providers: [{
+    provide: "AppService",
+    useClass: AppService
+  }], //通过Module装饰器注入中间键中
+})
+export class AppModule {}
+
+```
+
+可以通过改写 provide 字段和 useClass 字段来自定义
+
+比如
+
+```
+
+module.ts:
+
+import { Module } from '@nestjs/common';
+import { UserService } from './user.service';
+import { UserController } from './user.controller';
+
+@Module({
+  controllers: [UserController],
+  providers: [{
+    provide: "aaa",
+    useClass: UserService
+  }]
+})
+export class UserModule { }
+
+//自定义名称之后 需要用对应的Inject 取 不然会找不到的
+controller.ts:
+
+import { Controller, Get } from '@nestjs/common';
+import { UserService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor( @Inject("aaa") private readonly userService: UserService) {}
+
+  @Get()
+  getHello(): string {
+    return this.userService.getHello();
+  }
+}
+
+```
+
+### 3.自定义注入值
+
+通过 useValue
+
+```
+module.ts:
+
+import { Module } from '@nestjs/common';
+import { UserService } from './user.service';
+import { UserController } from './user.controller';
+
+@Module({
+  controllers: [UserController],
+  providers: [{
+    provide: "aaa",
+    useClass: UserService
+  }, {
+    provide: "JD",
+    useValue: ['TB', 'PDD', 'JD']
+  }]
+})
+export class UserModule { }
+
+controller.ts:
+
+import { Controller, Get } from '@nestjs/common';
+import { UserService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor( @Inject("JD") private readonly shopList: string[]) {}
+
+  @Get()
+  getHello(): string {
+    return this.shopList;
+  }
+}
+
+```
+
+### 4.工厂模式
+
+如果服务 之间有相互的依赖 或者逻辑处理 可以使用 useFactory
+
+```
+import { Module } from '@nestjs/common';
+import { UserService } from './user.service';
+import { UserService2 } from './user.service2';
+import { UserService3 } from './user.service3';
+import { UserController } from './user.controller';
+
+@Module({
+  controllers: [UserController],
+  providers: [{
+    provide: "aaa",
+    useClass: UserService
+  }, {
+    provide: "JD",
+    useValue: ['TB', 'PDD', 'JD']
+  },
+    UserService2,
+  {
+    provide: "Test",
+    inject: [UserService2],
+    useFactory(UserService2: UserService2) {
+      return new UserService3(UserService2)
+    }
+  }
+  ]
+})
+export class UserModule { }
+```
+
+### 4.异步模式
+
+useFactory 返回一个 promise 或者其他异步操作
+
+```
+import { Module } from '@nestjs/common';
+import { UserService } from './user.service';
+import { UserService2 } from './user.service2';
+import { UserService3 } from './user.service3';
+import { UserController } from './user.controller';
+
+@Module({
+  controllers: [UserController],
+  providers: [{
+    provide: "Xiaoman",
+    useClass: UserService
+  }, {
+    provide: "JD",
+    useValue: ['TB', 'PDD', 'JD']
+  },
+    UserService2,
+  {
+    provide: "Test",
+    inject: [UserService2],
+    useFactory(UserService2: UserService2) {
+      return new UserService3(UserService2)
+    }
+  },
+  {
+    provide: "sync",
+    async useFactory() {
+      return await  new Promise((r) => {
+        setTimeout(() => {
+          r('sync')
+        }, 3000)
+      })
+    }
+  }
+  ]
+})
+export class UserModule { }
+```
+
+## 8.nestjs 模块
+
+模块是具有`@Module()`装饰器的类。`@Module()`装饰器提供了元数据，`Nest `用它来组织应用程序结构。
+
+每个 `Nest` 应用程序至少有一个模块，即根模块。根模块是` Nest` 开始安排应用程序树的地方。事实上，根模块可能是应用程序中唯一的模块，特别是当应用程序很小时，但是对于大型程序来说这是没有意义的。在大多数情况下，您将拥有多个模块，每个模块都有一组紧密相关的功能
+
+`@Module()` 装饰器接受一个描述模块属性的对象：
+
+```
+providers	由 Nest 注入器实例化的提供者，并且可以至少在整个模块中共享
+controllers	必须创建的一组控制器
+imports	        导入模块的列表，这些模块导出了此模块中所需提供者
+exports	        由本模块提供并应在其他模块中可用的提供者的子集。
+```
+
+默认情况下，该模块封装提供程序。这意味着无法注入既不是当前模块的直接组成部分，也不是从导入的模块导出的提供程序。因此，您可以将从模块导出的提供程序视为模块的公共接口或 API。
+
+### 共享模块
+
+在 Nest 中，默认情况下，模块是单例，因此您可以轻松地在多个模块之间共享同一个提供者实例。
+
+实际上，每个模块都是一个共享模块。一旦创建就能被任意模块重复使用。假设我们将在几个模块之间共享 CatsService 实例。 我们需要把 CatsService 放到 exports 数组中，如下所示：
+
+```
+import { Module } from '@nestjs/common';
+import { CatsController } from './cats.controller';
+import { CatsService } from './cats.service';
+
+@Module({
+  controllers: [CatsController],
+  providers: [CatsService],
+  exports: [CatsService]
+})
+export class CatsModule {}
+```
+
+现在，每个导入 CatsModule 的模块都可以访问 CatsService ，并且它们将共享相同的 CatsService 实例。
+
+### 全局模块
+
+如果你不得不在任何地方导入相同的模块，那可能很烦人。在 Angular 中，提供者是在全局范围内注册的。一旦定义，他们到处可用。另一方面，Nest 将提供者封装在模块范围内。您无法在其他地方使用模块的提供者而不导入他们。但是有时候，你可能只想提供一组随时可用的东西 - 例如：helper，数据库连接等等。这就是为什么你能够使模块成为全局模块。
+
+`@Global` 装饰器使模块成为全局作用域。 全局模块应该只注册一次，最好由根或核心模块注册。 在上面的例子中，`CatsService` 组件将无处不在，而想要使用 `CatsService` 的模块则不需要在 `imports` 数组中导入 `CatsModule`。
+
+```
+import { Module, Global } from '@nestjs/common';
+import { CatsController } from './cats.controller';
+import { CatsService } from './cats.service';
+
+@Global()
+@Module({
+  controllers: [CatsController],
+  providers: [CatsService],
+  exports: [CatsService],
+})
+export class CatsModule {}
+
+```
+
+### 动态模块
+
+动态模块主要就是为了给模块传递参数 可以给该模块添加一个静态方法 用来接受参数
+
+```
+import { Module, DynamicModule, Global } from '@nestjs/common'
+
+
+
+interface Options {
+    path: string
+}
+
+@Global()
+@Module({
+
+})
+export class ConfigModule {
+    static forRoot(options: Options): DynamicModule {
+        return {
+            module: ConfigModule,
+            providers: [
+                {
+                    provide: "Config",
+                    useValue: { baseApi: "/api" + options.path }
+                }
+            ],
+            exports: [
+                {
+                    provide: "Config",
+                    useValue: { baseApi: "/api" + options.path }
+                }
+            ]
+        }
+    }
+}
+
+app.module.ts:
+
+@Module({
+  imports: [ConfigModule.forRoot({ path: "/api/v1" })],
+  controllers: [AppController, UserController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
