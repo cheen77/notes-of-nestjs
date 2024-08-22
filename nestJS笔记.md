@@ -435,3 +435,303 @@ UPDATE src/user/user.module.ts (159 bytes)
   UPDATE src/app.module.ts (456 bytes)
 ✔ Packages installed successfully.
 ```
+
+## 5. RESTful 风格设计
+
+#### 定义
+
+RESTful 是一种风格，在 RESTful 中，一切都被认为是资源，每个资源有对应的 URL 标识.
+
+不是标准也不是协议，只是一种风格。当然你也可以不按照他的风格去写。
+
+#### 1.接口 url
+
+###### 传统接口
+
+http://localhost:8080/api/get_list?id=1
+
+http://localhost:8080/api/delete_list?id=1
+
+http://localhost:8080/api/update_list?id=1
+
+##### RESTful 接口
+
+http://localhost:8080/api/get_list/1 查询 删除 更新
+
+RESTful 风格一个接口就会完成 增删改差 他是通过不同的请求方式来区分的
+
+查询 GET
+
+提交 POST
+
+更新 PUT PATCH
+
+删除 DELETE
+
+#### 2.RESTful 版本控制
+
+一共有三种我们一般用第一种 更加语义化
+
+URI Versioning 版本将在请求的 URI 中传递（默认）
+Header Versioning 自定义请求标头将指定版本
+Media Type Versioning 请求的 Accept 标头将指定版本
+
+main.ts
+
+```
+import { NestFactory } from '@nestjs/core';
+import { VersioningType } from '@nestjs/common';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.enableVersioning({
+    type: VersioningType.URI,
+  })
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+然后在 user.controller 配置版本
+
+Controller 变成一个对象 通过 version 配置版本
+
+```
+import { Controller, Get, Post, Body, Patch, Param, Delete, Version } from '@nestjs/common';
+import { UserService } from './user.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Controller({
+  path:"user",
+  version:'1'
+})
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  @Post()
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.userService.create(createUserDto);
+  }
+
+  @Get()
+  // @Version('1')
+  findAll() {
+    return this.userService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.userService.findOne(+id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.update(+id, updateUserDto);
+  }
+
+  localhost:3000/v1/user
+```
+
+#### 3.Code 码规范
+
+200 OK
+
+304 Not Modified 协商缓存了
+
+400 Bad Request 参数错误
+
+401 Unauthorized token 错误
+
+403 Forbidden referer origin 验证失败
+
+404 Not Found 接口不存在
+
+500 Internal Server Error 服务端错误
+
+502 Bad Gateway 上游接口有问题或者服务器问题
+
+## 6.nestjs 控制器
+
+控制器负责处理传入的请求和向客户端返回响应。
+
+### 参数装饰器
+
+nestjs 提供了方法参数装饰器 用来帮助我们快速获取参数
+
+```
+
+@Request(),@Req()	              req
+@Response(),@Res()	              res
+@Next()	                              next
+@Session()	                      req.session
+@Param(key?: string)	              req.params/req.params[key]
+@Body(key?: string)	              req.body/req.body[key]
+@Query(key?: string)                  req.query/req.query[key]
+@Headers(name?: string)	              req.headers/req.headers[name]
+@Ip()	                              req.ip
+@HostParam()	                      req.hosts
+@HttpCode
+```
+
+#### 1.获取 get 请求传参
+
+可以使用 Request 装饰器 或者 Query 装饰器 跟 express 完全一样
+
+```
+import { Controller, Get, Req, Request, Query, Post, Body, Patch, Param, Delete } from '@nestjs/common'
+import { DocService } from './doc.service'
+
+@Controller('doc')
+export class DocController {
+  constructor(private readonly docService: DocService) {}
+
+  //1. 可以通过 @Request()或者@Req req 获取请求对象 req.query获取请求参数
+  @Get('get1') //前端通过doc/get1?name=chen&age=18访问
+  find(@Req() req) {
+    // console.log('req', req.query)
+
+    return {
+      code: 200,
+      success: 'ok',
+      data: req.query,
+    }
+  }
+
+  //2. 可以通过 @Query
+  @Get('get2') //前端通过doc/get2?name=chen&age=18访问
+  find2(@Query() query) {
+    console.log('query', query)
+    return {
+      code: 200,
+      success: 'ok',
+      data: query,
+    }
+  }
+
+    //3. 还可以直接获取key
+  @Get('get2') //前端通过doc/get2?name=chen&age=18访问
+  find3(@Query("name") query) {
+    console.log('query', query) //chen
+    return {
+      code: 200,
+      success: 'ok',
+      data: query,
+    }
+  }
+}
+
+```
+
+#### 2.post 获取参数
+
+可以使用 Request 装饰器 或者 Body 装饰器 跟 express 完全一样
+
+```
+//1. 可以通过 @Request()或者@Req req 获取请求对象 req.body获取请求参数
+
+  @Post('post1')
+  create(@Req() req) {
+    console.log('req', req.body)
+
+    return {
+      code: 200,
+      success: 'ok',
+      data: req.body,
+    }
+  }
+
+  //  2.可以通过 @Body直接获取
+
+  @Post('post2')
+  create2(@Body() body) {
+    console.log('body', body)
+
+    return {
+      code: 200,
+      success: 'ok',
+      data: body,
+    }
+  }
+
+    // 3.还可以直接获取key
+  @Post('post3')
+  create3(@Body('name') body) {
+    console.log('body', body) // chen
+
+    return {
+      code: 200,
+      success: 'ok',
+      data: body,
+    }
+  }
+```
+
+#### 3.动态路由
+
+可以使用 Request 装饰器 或者 Param 装饰器 跟 express 完全一样
+
+```type
+  //  动态路由
+
+  // 1.通过 @Req  req.params获取
+  @Get('get1/:id')
+  findOne(@Req() req) {
+    console.log('params', req.params)
+    return {
+      code: 200,
+      success: 'ok',
+      data: req.params,
+    }
+  }
+
+  // 2.通过 @Param  params获取
+  @Get('get2/:id')
+  findOne1(@Param() params) {
+    console.log('params', params)
+    return {
+      code: 200,
+      success: 'ok',
+      data: params,
+    }
+  }
+```
+
+#### 4.读取 header 信息
+
+在调试工具随便加了一个 cookie
+
+```
+  // 获取header信息
+  @Get(':id')
+  findId(@Headers() header) {
+    console.log('header', header)
+
+    return {
+      code: 200,
+      success: 'ok',
+      data: header,
+    }
+  }
+
+```
+
+#### 5.状态码
+
+使用 HttpCode 装饰器 控制接口返回的状态码
+
+```typescript
+  // 状态码
+  @Get('code/:id')
+  @HttpCode(500)
+  findId2(@Headers() header) {
+    console.log('header', header)
+
+    return {
+      code: 200,
+      success: 'ok',
+      data: header,
+    }
+  }
+```
