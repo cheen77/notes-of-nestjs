@@ -8,6 +8,9 @@ nestjs 还是一个 `spring MVC` 的风格 其中有`依赖注入`, `IOC 控制�
 
 nestjs 的底层代码运用了 express 和 Fastify 在他们的基础上提供了一定程度的抽象，同时也将其 API 直接暴露给开发人员。这样可以轻松使用每个平台的无数第三方模块
 
+nestjs 中文文档 https://docs.nestjs.cn/10/introduction
+nestjs 英文文档 https://nestjs.com/
+
 ## 2.前置知识
 
 ### AOP 面向切面编程
@@ -326,3 +329,109 @@ console.log(curriedSum(1)(2)); // 3
 ```
 
 ## 3.nestjs-cli
+
+```
+node版本 >= 16
+
+$ npm i -g @nestjs/cli
+$ nest new project-name
+```
+
+```
+src
+ ├── app.controller.spec.ts 对于基本控制器的单元测试样例
+ ├── app.controller.ts      控制层,这里主要是写路由相关代码以及处理前端传来的一些参数
+ ├── app.module.ts          组织应用程序中的许多功能,如控制器、服务以及可以导入其他模块等
+ ├── app.service.ts         业务层,在这里写一些与业务相关的逻辑。比如对数据库的 CRUD
+ └── main.ts                整个程序的入口文件
+```
+
+## 4. nestjs cli 常用命令
+
+```
+nest --help 可以查看nestjs所有的命令
+
+      │  name         │ alias       │ description                                  │
+      │ application   │ application │ Generate a new application workspace         │
+      │ class         │ cl          │ Generate a new class                         │
+      │ configuration │ config      │ Generate a CLI configuration file            │
+      │ controller    │ co          │ Generate a controller declaration            │
+      │ decorator     │ d           │ Generate a custom decorator                  │
+      │ filter        │ f           │ Generate a filter declaration                │
+      │ gateway       │ ga          │ Generate a gateway declaration               │
+      │ guard         │ gu          │ Generate a guard declaration                 │
+      │ interceptor   │ itc         │ Generate an interceptor declaration          │
+      │ interface     │ itf         │ Generate an interface                        │
+      │ library       │ lib         │ Generate a new library within a monorepo     │
+      │ middleware    │ mi          │ Generate a middleware declaration            │
+      │ module        │ mo          │ Generate a module declaration                │
+      │ pipe          │ pi          │ Generate a pipe declaration                  │
+      │ provider      │ pr          │ Generate a provider declaration              │
+      │ resolver      │ r           │ Generate a GraphQL resolver declaration      │
+      │ resource      │ res         │ Generate a new CRUD resource                 │
+      │ service       │ s           │ Generate a service declaration               │
+      │ sub-app       │ app         │ Generate a new application within a monorepo │
+
+
+
+```
+
+### 生成一个 user 模块
+
+#### 1.生成 controller.ts
+
+```
+nest g co user  // g:generate co:controller简写
+
+CREATE src/user/user.controller.ts (101 bytes)
+CREATE src/user/user.controller.spec.ts (496 bytes)
+UPDATE src/app.module.ts (332 bytes)
+
+这样会生成一个文件在src/user/user.controller.ts
+```
+
+#### 2.生成 module.ts
+
+```
+nest g mo user
+
+UPDATE src/app.module.ts (391 bytes)
+```
+
+#### 3.生成 service.ts
+
+```
+nest g s user
+
+CREATE src/user/user.service.ts (92 bytes)
+CREATE src/user/user.service.spec.ts (464 bytes)
+UPDATE src/user/user.module.ts (159 bytes)
+```
+
+### 一键生成 CURD
+
+```
+ nest g resource user2
+
+ ? What transport layer do you use? (Use arrow keys)
+> REST API
+  GraphQL (code first)
+  GraphQL (schema first)
+  Microservice (non-HTTP)
+  WebSockets
+
+  ? What transport layer do you use? REST API
+  ? Would you like to generate CRUD entry points? (Y/n) y
+
+  CREATE src/user2/user2.controller.ts (938 bytes)
+  CREATE src/user2/user2.controller.spec.ts (586 bytes)
+  CREATE src/user2/user2.module.ts (257 bytes)
+  CREATE src/user2/user2.service.ts (647 bytes)
+  CREATE src/user2/user2.service.spec.ts (471 bytes)
+  CREATE src/user2/dto/create-user2.dto.ts (32 bytes)
+  CREATE src/user2/dto/update-user2.dto.ts (177 bytes)
+  CREATE src/user2/entities/user2.entity.ts (23 bytes)
+  UPDATE package.json (2057 bytes)
+  UPDATE src/app.module.ts (456 bytes)
+✔ Packages installed successfully.
+```
