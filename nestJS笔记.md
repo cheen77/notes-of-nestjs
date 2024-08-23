@@ -1045,7 +1045,7 @@ app.module.ts:
 export class AppModule {}
 ```
 
-## nestjs 中间件
+## 9.nestjs 中间件
 
 中间件是在路由处理程序 之前 调用的函数。 中间件函数可以访问请求和响应对象，以及应用程序请求响应周期中的`next()`中间件函数。 `next()`中间件函数通常由名为 `next` 的变量表示。
 
@@ -1143,6 +1143,16 @@ consumer
 consumer.apply(cors(), helmet(), logger).forRoutes(CatsController);
 ```
 
+```
+
+implements与extends的定位
+implements
+实现，一个新的类，从父类或者接口实现所有的属性和方法，同时可以重写属性和方法，包含一些新的功能
+extends
+继承，一个新的接口或者类，从父类或者接口继承所有的属性和方法，不可以重写属性，但可以重写方法
+
+```
+
 ### 2.全局中间件
 
 注意全局中间件只能使用函数模式 案例可以做白名单拦截之类的
@@ -1182,3 +1192,212 @@ async function bootstrap() {
 bootstrap()
 
 ```
+
+## 10.实战：nestjs 上传图片-静态目录
+
+### 图片上传
+
+### [官网教程](https://docs.nestjs.cn/10/techniques?id=%e6%96%87%e4%bb%b6%e4%b8%8a%e4%bc%a0)
+
+为了处理文件上传，`Nest` 提供了一个内置的基于` multer` 中间件包的` Express` 模块。`Multer` 处理以`multipart/form-data`格式发送的数据，该格式主要用于通过 `HTTP POST` 请求上传文件。
+
+**tips**
+`Multer` 无法处理不是受支持的多部分格式（ `multipart/form-data` ）的数据。 另外，请注意此程序包与 `FastifyAdapter `不兼容。
+
+#### 1.主要会用到两个包
+
+multer @nestjs/platform-express nestJs 自带了
+
+@types/multer 这需要安装
+
+```
+ pnpm i -D @types/multer
+```
+
+只要这个模块被安装，我们就可以使用 `Express.Multer.File` 这个类型（你可以通过 `import { Express } from 'express'` 导入这个类型）。
+
+#### 2.upload Module 模块
+
+在 `upload.module.ts` `Module`中 使用`MulterModule register` 注册存放图片的目录
+
+upload.module.ts：
+
+```
+import { Module } from '@nestjs/common'
+import { UploadService } from './upload.service'
+import { UploadController } from './upload.controller'
+
+// 在upload  Module 使用MulterModule register注册存放图片的目录
+import { MulterModule } from '@nestjs/platform-express'
+
+import { diskStorage } from 'multer'
+import { join, extname } from 'path'
+
+@Module({
+  // 在upload  Module 使用MulterModule register注册存放图片的目录
+  imports: [
+    MulterModule.register({
+      storage: diskStorage({
+        destination: join(__dirname, '../uploadImages'),
+        filename: (req, file, callback) => {
+          const filename = `${new Date().getTime() + extname(file.originalname)}`
+          return callback(null, filename)
+        },
+      }),
+    }),
+  ],
+  controllers: [UploadController],
+  providers: [UploadService],
+})
+export class UploadModule {}
+
+```
+
+#### 3.upload Controller 路由
+
+当我们要上传单个文件时, 我们只需将  `FileInterceptor()`  与处理程序绑定在一起, 然后使用  `@UploadedFile()`  装饰器从  `request`  中取出  `file`。
+
+`FileInterceptor()`  装饰器是  `@nestjs/platform-express`  包提供的，
+
+`@UploadedFile()`  装饰器是  `@nestjs/common`  包提供的。
+
+`FileInterceptor()` 接收两个参数：
+
+- 一个 `fieldName` (指向包含文件的 HTML 表单的字段)
+- 可选 `options` 对象, 类型为 `MulterOptions` 。这个和被传入 multer 构造函数 ([此处](https://github.com/expressjs/multer#multeropts)有更多详细信息) 的对象是同一个对象。
+
+upload.controller.ts：
+
+```
+// UseInterceptors, UploadedFile
+import { Controller, Get, Post, UseInterceptors, UploadedFile } from '@nestjs/common'
+import { UploadService } from './upload.service'
+//
+import { FileInterceptor } from '@nestjs/platform-express'
+@Controller('upload')
+export class UploadController {
+  constructor(private readonly uploadService: UploadService) {}
+
+  // upload/album
+  @Post('album')
+  @UseInterceptors(FileInterceptor('file')) //与前端接口中字段匹配
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    //@UploadedFile()  装饰器从  request  中取出  file
+    console.log(file)
+
+    return {
+      code: 200,
+      data: file,
+    }
+  }
+}
+
+
+```
+
+### 静态目录
+
+main.ts：
+
+```
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import {NestExpressApplication} from '@nestjs/platform-express'
+import { join } from 'path'
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useStaticAssets(join(__dirname,'images'),{ //与前端静态资源路径一致
+     prefix:"/img" //访问前缀
+  })
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+useStaticAssets prefix 是虚拟前缀
+http://localhost:3000/img/1724396570674.png
+
+## 11.实战：nestjs 下载文件和文件流
+
+介绍了两种在 Node.js 中实现文件下载的方法。
+第一种是通过`res.download()`直接下载文件，
+另一种是利用`compressing`库创建文件流并以 ZIP 格式发送到前端。前端部分展示了如何接收并保存流式下载的文件。
+
+### 1.download 直接下载
+
+这个文件信息应该存数据库 我们这儿演示就写死 了
+
+```
+import { Controller, Post, UseInterceptors, UploadedFile, Get, Res } from '@nestjs/common';
+import { UploadService } from './upload.service';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
+import type { Response } from 'express'
+import {join} from 'path'
+@Controller('upload')
+export class UploadController {
+  constructor(private readonly uploadService: UploadService) { }
+  @Post('album')
+  @UseInterceptors(FileInterceptor('file'))
+  upload(@UploadedFile() file) {
+    console.log(file, 'file')
+    return '峰峰35岁憋不住了'
+  }
+  @Get('export')
+  downLoad(@Res() res: Response) {
+    const url = join(__dirname,'../images/1662894316133.png')
+    // res
+    // console.log(url)
+    res.download(url)
+    // return  true
+  }
+}
+```
+
+访问 localhost:3000/upload/export
+
+### 2.使用文件流的方式下载
+
+可以使用 compressing 把他压缩成一个 zip 包
+
+import {zip} from 'compressing'
+
+```
+  @Get('stream')
+  async down (@Res() res:Response) {
+    const url = join(__dirname,'../images/1662894316133.png')
+    const tarStream  = new zip.Stream()
+    await tarStream.addEntry(url)
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=xiaoman`,
+    );
+
+    tarStream.pipe(res)
+
+  }
+```
+
+前端接受流
+
+```
+const useFetch = async (url: string) => {
+  const res = await fetch(url).then(res => res.arrayBuffer())
+  console.log(res)
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([res],{
+    // type:"image/png"
+  }))
+  a.download = 'aaa.zip'
+  a.click()
+}
+
+const download = () => {
+  useFetch('http://localhost:3000/upload/stream')
+}
+```
+
+## 12. nestjs 和 RxJs
+
