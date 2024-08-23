@@ -1044,3 +1044,141 @@ app.module.ts:
 })
 export class AppModule {}
 ```
+
+## nestjs 中间件
+
+中间件是在路由处理程序 之前 调用的函数。 中间件函数可以访问请求和响应对象，以及应用程序请求响应周期中的`next()`中间件函数。 `next()`中间件函数通常由名为 `next` 的变量表示。
+
+Nest 中间件实际上等价于 express 中间件。 下面是 Express 官方文档中所述的中间件功能：
+
+中间件函数可以执行以下任务:
+
+执行任何代码。
+对请求和响应对象进行更改。
+结束请求-响应周期。
+调用堆栈中的下一个中间件函数。
+如果当前的中间件函数没有结束请求-响应周期, 它必须调用 next() 将控制传递给下一个中间件函数。否则, 请求将被挂起。
+
+### 1.应用中间件
+
+可以在函数中或在具有 `@Injectable()` 装饰器的类中实现自定义 `Nest` 中间件。 这个类应该实现 `NestMiddleware` 接口, 而函数没有任何特殊的要求。 让我们首先使用类方法实现一个简单的中间件功能。
+
+要求我们实现 `use` 函数 返回 `req` `res` `next` 参数 如果不调用 `next` 程序将被挂起
+
+自动生成一个中间件
+
+```
+nest g mi
+
+What name would you like to use for the middleware? logger
+CREATE logger/logger.middleware.ts (206 bytes)
+CREATE logger/logger.middleware.spec.ts (195 bytes)
+```
+
+自定义创建一个可以依赖注入的中间件
+
+```
+import { Injectable, NestMiddleware } from '@nestjs/common'
+import { Request, Response, NextFunction } from 'express'
+@Injectable()
+export class LoggerMiddleware implements NestMiddleware {
+  use(req: Request, res: Response, next: NextFunction) {
+    console.log('Request...')
+    next()
+  }
+}
+
+```
+
+使用方法 在模块里面 实现 `configure` 返回一个消费者 `consumer` 通过 `apply` 注册中间件 通过 `forRoutes` 指定 `Controller` 路由
+
+中间件不能在 `@Module()` 装饰器中列出。我们必须使用模块类的 `configure()` 方法来设置它们。包含中间件的模块必须实现`NestModule`接口
+
+doc.module.ts:
+
+```
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common' //包含中间件的模块必须实现 NestModule 接口
+import { DocService } from './doc.service'
+import { DocController } from './doc.controller'
+// 引入中间件
+import { LoggerMiddleware } from '../middleware/logger/logger.middleware'
+
+@Module({
+  controllers: [DocController],
+  providers: [DocService],
+  exports: [DocService],
+})
+export class DocModule implements NestModule {
+  //使用方法 在模块里面 实现 configure 返回一个消费者  consumer 通过 apply 注册中间件 通过forRoutes 指定  Controller 路由
+  configure(consumer: MiddlewareConsumer) {
+    // consumer.apply(LoggerMiddleware).forRoutes('doc')  //指定 Controller 路由1
+    consumer.apply(LoggerMiddleware).forRoutes({ path: 'doc/get1', method: RequestMethod.GET }) //也可以指定 拦截的方法 比如拦截GET  POST 等 forRoutes 使用对象配置
+    // consumer.apply(LoggerMiddleware).forRoutes(DocController) //你甚至可以直接吧 UserController 塞进去
+  }
+}
+
+```
+
+这样以后访问 localhost:3000/doc/get1 就会打印出 Request...
+
+**tips**
+
+```
+有时我们想从应用中间件中排除某些路由。我们可以使用该 exclude() 方法轻松排除某些路由。此方法可以采用一个字符串，多个字符串或一个 RouteInfo 对象来标识要排除的路由，如下所示：
+
+consumer
+  .apply(LoggerMiddleware)
+  .exclude(
+    { path: 'cats', method: RequestMethod.GET },
+    { path: 'cats', method: RequestMethod.POST },
+    'cats/(.*)',
+  )
+  .forRoutes(CatsController);
+```
+
+```
+多个中间件
+如前所述，为了绑定顺序执行的多个中间件，我们可以在 apply() 方法内用逗号分隔它们。
+
+consumer.apply(cors(), helmet(), logger).forRoutes(CatsController);
+```
+
+### 2.全局中间件
+
+注意全局中间件只能使用函数模式 案例可以做白名单拦截之类的
+
+```
+import { NestFactory } from '@nestjs/core'
+import { AppModule } from './app.module'
+import { VersioningType } from '@nestjs/common'
+
+import { Request, Response, NextFunction } from 'express'
+// 全局中间件只能使用函数模式
+const whiteList = ['/doc1']
+
+function middlewareAll(req: Request, res: Response, next: NextFunction) {
+  console.log('app middleware', req.originalUrl)
+
+  if (whiteList.includes(req.originalUrl)) {
+    next()
+  } else {
+    res.send('白名单拦截')
+  }
+}
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule)
+  app.enableVersioning({
+    type: VersioningType.URI,
+  })
+
+  app.setGlobalPrefix('api', {
+    //排除/路由
+    exclude: ['/'],
+  })
+  // 全局中间件
+  app.use(middlewareAll)
+  await app.listen(3000)
+}
+bootstrap()
+
+```
