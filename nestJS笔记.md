@@ -1403,7 +1403,7 @@ const download = () => {
 
 ## 13. nestjs 拦截器
 
-### 定义
+### 1.定义
 
 拦截器是使用` @Injectable()` 装饰器注解的类。拦截器应该实现 `NestInterceptor `接口。
 
@@ -1415,9 +1415,8 @@ const download = () => {
 扩展基本函数行为
 根据所选条件完全重写函数 (例如, 缓存目的)
 
-我们现在没有给我们的 Nestjs 规范返回给前端的格式现在比较乱
-
-我们想给他返回一个标准的 json 格式 就要给我们的数据做一个全局 format
+我们现在没有给我们的 `Nestjs` 规范返回给前端的格式现在比较乱
+我们想给他返回一个标准的` json 格式` 就要给我们的数据做一个全局 `format`
 
 比如 后端统一要求返回这种格式：
 
@@ -1432,21 +1431,23 @@ success:true
 
 那么就需要利用 nestjs 中的拦截器去统一返回格式
 
-### 使用
+### 2.实现一个全局拦截器
 
 #### 1.新建 common 文件夹 创建 response.ts
 
 `Nest Js` 配合` Rxjs` 格式化数据
 
 ```
-import { NestInterceptor, CallHandler } from '@nestjs/common'
-import { Observable } from 'rxjs'
-import { map } from 'rxjs/operators'
+import { NestInterceptor, CallHandler, Inject, Injectable } from "@nestjs/common";
+import { Observable } from "rxjs";
+import { map } from "rxjs/operators";
 interface data<T> {
-  data: T
+  data: T;
 }
 
 // 需要实现实现 NestInterceptor 接口 。 需要implements NestInterceptor
+// 拦截器类
+@Injectable()
 export class iResponse<T = any> implements NestInterceptor {
   /**
    *
@@ -1454,24 +1455,37 @@ export class iResponse<T = any> implements NestInterceptor {
    * @param next  包装执行流的对象
    */
   intercept(context, next: CallHandler): Observable<data<T>> {
-    console.log('next', next)
-    console.log('context', context)
+    console.log("next", next);
+    console.log("context", context);
     // 由于 handle() 返回一个RxJS Observable，我们有很多种操作符可以用来操作流。
     return next.handle().pipe(
       map((data) => {
         return {
           code: 1000,
           data,
-          message: '成功',
+          message: "成功",
           success: true,
-        }
-      }),
-    )
+        };
+      })
+    );
   }
 }
 
 
 ```
+
+**tips**
+
+`@Injectable() `是 `NestJS `中的一个装饰器，用于将类标记为可注入的服务（provider）。这意味着该类可以在整个应用程序中被依赖注入系统管理，并在需要时被注入到其他类中。
+
+`@Injectable()` 的主要作用：
+`依赖注入（DI）`： 使用 `@Injectable()` 标记的类可以通过依赖注入系统注入到其他类的构造函数中。这使得类之间的依赖关系管理更加简洁和可维护。
+
+`服务的生命周期管理`： `NestJS `会管理标记为` @Injectable()` 的类的生命周期。这意味着你不需要手动创建和销毁这些对象，`NestJS` 会在需要时自动实例化并销毁它们。
+
+模块间共享: 通过 `@Injectable()`，服务可以在模块之间共享，避免重复创建相同的实例，从而提高应用程序的性能和一致性。
+
+简单来说，`@Injectable()` 使得类能够被` NestJS` 的依赖注入系统管理，从而在整个应用程序中更方便地使用和共享。
 
 #### 2.在 main.ts 注册这个类
 
@@ -1481,7 +1495,59 @@ import { iResponse } from './common/response'
   app.useGlobalInterceptors(new iResponse())
 ```
 
-### 与中间件和过滤器区别
+### 3.controller 绑定拦截器
+
+#### 1.新建 logging.interceptor.ts
+
+logging.interceptor.ts：
+
+```
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
+import { Observable } from "rxjs/";
+import { tap } from 'rxjs/operators';
+
+@Injectable()
+export class LoggingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    console.log("Before...");
+
+    const now = Date.now();
+    // tap() 运算符，该运算符在可观察序列的正常或异常终止时调用函数。
+    return next
+      .handle()
+      .pipe(tap(() => console.log(`After... ${Date.now() - now}ms`)));
+  }
+}
+
+```
+
+#### 2.在 DocController 中绑定拦截器
+
+```
+import { LoggingInterceptor } from "src/common/logging.interceptor";
+
+@Controller("doc")
+// UseInterceptors() 装饰器
+// DocController 中定义的每个路由处理程序都将使用 LoggingInterceptor。
+// 当有人调用  接口 时，将在控制台窗口中看到以下输出：
+// Before...
+// After... 1ms
+@UseInterceptors(LoggingInterceptor) //传递的是 LoggingInterceptor 类型而不是实例，让框架承担实例化责任并启用依赖注入
+// @UseInterceptors(new LoggingInterceptor()) //传递立即创建的实例
+export class DocController {
+
+  .....
+}
+```
+
+当有人调用 接口 时，将在控制台窗口中看到以下输出：
+
+```
+// Before...
+// After... 1ms
+```
+
+### 4.与中间件和过滤器区别
 
 #### 与中间件
 
@@ -1539,3 +1605,212 @@ import { iResponse } from './common/response'
 过滤器则专注于异常处理，确保应用的稳定性和一致性。
 
 ## 14. nestjs 异常过滤器
+
+异常过滤器（`ExceptionFilter`）是 `NestJS` 中用于处理异常的机制。异常过滤器可以在应用程序中捕获并处理未处理的异常，并根据异常类型返回适当的响应。异常过滤器通常用于处理应用程序中的错误和异常，例如数据库连接失败、资源不存在等。
+
+开箱即用，此操作由内置的全局异常过滤器执行，该过滤器处理类型 `HttpException`（及其子类）的异常。每个发生的异常都由`全局异常过滤器`处理, 当这个异常无法被识别时 (既不是 `HttpException` 也不是继承的类 HttpException ) , 用户将收到以下 JSON 响应:
+
+```
+{
+    "statusCode": 500,
+    "message": "Internal server error"
+}
+```
+
+### 全局异常过滤器
+
+#### 1.common 下面新建 filter.ts
+
+让我们创建一个异常过滤器，它负责捕获作为 `HttpException` 类实例的异常，并为它们设置自定义响应逻辑。为此，我们需要访问底层平台 `Request `和 `Response`。我们将访问 `Request `对象，以便提取原始 url 并将其包含在日志信息中。我们将使用` Response.json()`方法，使用`Response`对象直接控制发送的响应。
+
+```
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+} from "@nestjs/common";
+import { Request, Response } from "express";
+
+// 实现一个 HttpExceptionFilter类 接收异常信息
+
+// @Catch() 装饰器绑定所需的元数据到异常过滤器上。它告诉 Nest这个特定的过滤器正在寻找 HttpException 而不是其他的。
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+
+    // console.log("错误信息", exception);
+
+    response.status(status).json({
+      code: status,
+      data: exception.message,
+      message: "失败",
+      success: false,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+    });
+  }
+}
+
+
+
+
+~~~~
+
+#### 2.main.ts注册全局异常过滤器
+
+~~~~
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+import { VersioningType } from "@nestjs/common";
+
+import { Request, Response, NextFunction } from "express";
+
+// useStaticAssets prefix 是虚拟前缀
+import { NestExpressApplication } from "@nestjs/platform-express";
+
+import { join } from "path";
+
+// 注册全局响应拦截器
+import { iResponse } from "./common/response";
+
+// 注册全局异常过滤器
+import { HttpExceptionFilter } from "./common/filter";
+
+// 全局中间件只能使用函数模式
+// const whiteList = ['/doc1']
+
+// function middlewareAll(req: Request, res: Response, next: NextFunction) {
+//   console.log('app middleware', req.originalUrl)
+
+//   if (whiteList.includes(req.originalUrl)) {
+//     next()
+//   } else {
+//     res.send('白名单拦截')
+//   }
+// }
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  //查看静态资源   useStaticAssets prefix 是虚拟前缀
+  app.useStaticAssets(join(__dirname, "uploadImages"), { prefix: "/img" }); //与前端静态资源路径一致
+
+  // 版本控制
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
+
+  // 全局路由前缀
+  app.setGlobalPrefix("api", {
+    //排除/路由
+    exclude: ["/"],
+  });
+
+  // 全局响应拦截器
+  app.useGlobalInterceptors(new iResponse());
+
+  // 全局异常过滤器
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  // 全局中间件
+  // app.use(middlewareAll)
+
+  await app.listen(3000);
+}
+bootstrap();
+
+~~~~
+```
+
+apifox 访问 http://localhost:3000/aaa
+返回
+
+```
+{
+    "code": 404,
+    "data": "Cannot GET /ggsf",
+    "message": "失败",
+    "success": false,
+    "timestamp": "2024-08-24T10:52:16.956Z",
+    "path": "/ggsf"
+}
+```
+
+### 控制器绑定过滤器
+
+也可以把过滤器绑定到特定的控制器或方法上。
+
+将 `HttpExceptionFilter` 绑定到 `DocController` 上，这样当 `DocController` 处理任何请求时，都会使用过滤器。
+
+doc.controller.ts:
+
+```
+import {
+  Controller,
+  Get,
+  Req,
+  Request,
+  Query,
+  Headers,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpCode,
+  Header,
+  UseFilters,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+} from "@nestjs/common";
+import { DocService } from "./doc.service";
+
+// 引入异常过滤器HttpExceptionFilter
+import { HttpExceptionFilter } from "../common/filter";
+
+@Controller("doc")
+export class DocController {
+  constructor(private readonly docService: DocService) {}
+
+
+  // 绑定过滤器
+  @Post("post5")
+  @UseFilters(new HttpExceptionFilter())
+  async create22(@Body() body) {
+    throw new ForbiddenException();
+  }
+
+  // 绑定过滤器
+  @Get("get5")
+  async find5(@Query() Query) {
+    throw new HttpException("Forbidden", HttpStatus.FORBIDDEN);
+  }
+}
+
+```
+
+### 内置 HTTP 异常
+
+为了减少样板代码，Nest 提供了一系列继承自核心异常 HttpException 的可用异常。所有这些都可以在 @nestjs/common 包中找到：
+
+BadRequestException
+UnauthorizedException
+NotFoundException
+ForbiddenException
+NotAcceptableException
+RequestTimeoutException
+ConflictException
+GoneException
+PayloadTooLargeException
+UnsupportedMediaTypeException
+UnprocessableException
+InternalServerErrorException
+NotImplementedException
+BadGatewayException
+ServiceUnavailableException
+GatewayTimeoutException
