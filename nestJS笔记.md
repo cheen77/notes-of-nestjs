@@ -1814,3 +1814,314 @@ NotImplementedException
 BadGatewayException
 ServiceUnavailableException
 GatewayTimeoutException
+
+## 15.nestjs 管道
+
+### 1.执行顺序
+
+从客户端发送一个 `post` 请求，路径为：`/user/login`，请求参数为：`{userinfo: ‘xx’,password: ‘xx’}`，到服务器接收请求内容，触发绑定的函数并且执行相关逻辑完毕，然后返回内容给客户端的整个过程大体上要经过如下几个步骤：
+
+![alt text](image.png)
+
+### 2.管道
+
+在 Nestjs 中管道是具有 `@Injectable()` 装饰器且已实现 `PipeTransform` 接口的类。
+
+管道有两个典型的应用场景:
+
+`转换`：管道将输入数据转换为所需的数据输出(例如，将字符串转换为整数)
+`验证`：对输入数据进行验证，如果验证成功继续传递; 验证失败则抛出异常
+
+在这两种情况下, 管道 `参数(arguments)` 会由 控制器(`controllers`)的路由处理程序 进行处理。Nest 会在调用这个方法之前插入一个管道，管道会先拦截方法的调用参数,进行转换或是验证处理，然后用转换好或是验证好的参数调用原方法。
+
+Nest 自带很多开箱即用的内置管道。你还可以构建自定义管道。
+
+### 3.内置管道
+
+`Nest` 自带九个开箱即用的管道，即
+
+`ValidationPipe`
+`ParseIntPipe`
+`ParseFloatPipe`
+`ParseBoolPipe`
+`ParseArrayPipe`
+`ParseUUIDPipe`
+`ParseEnumPipe`
+`DefaultValuePipe`
+`ParseFilePipe`
+
+他们从 `@nestjs/common` 包中导出
+
+#### 案例 1：实现一个 ParseIntPipe
+
+##### 1.创建一个 CRUD 模板
+
+```
+
+如果希望创建到src/modules目录下
+
+使用 nest-cli.json 自定义源目录
+
+{
+  "sourceRoot": "src/modules"
+}
+
+nest g res list
+
+这样就能生成到src/modules目录下了
+```
+
+##### 2. list 的 controller.ts 中实现一个接口
+
+```
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { ListService } from './list.service';
+@Controller('list')
+export class ListController {
+  constructor(private readonly listService: ListService) { }
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    console.log("id", id, typeof id);  // 1 string
+
+    return this.listService.findOne(+id);
+  }
+
+}
+
+```
+
+如果我们希望将 id 转成数字类型 ，可以使用管道的 ParseIntPipe
+
+```
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ListService } from './list.service';
+@Controller('list')
+export class ListController {
+  constructor(private readonly listService: ListService) { }
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    console.log("id", id, typeof id); // 1 number
+    return this.listService.findOne(+id);
+  }
+}
+
+```
+
+#### 案例 2:验证 UUID
+
+##### 1.安装 uuid
+
+```
+npm install uuid -S
+
+npm install @types/uuid -D
+```
+
+##### 2.生成一个 uuid
+
+```
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
+import { ListService } from './list.service';
+@Controller('list')
+export class ListController {
+  constructor(private readonly listService: ListService) { }
+  // 案例2 ParseUUIDPipe
+  @Get(':id')
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    console.log("id", id, typeof id); //d485e074-e0f6-48ab-8ae1-51c11a8c1034 string
+    return this.listService.findOne(+id);
+  }
+}
+
+```
+
+当发 http 请求 http://localhost:3000/api/list/d485e074-e0f6-48ab-8ae1-51c11a8c1034 能够走通
+当发 http 请求 http://localhost:3000/api/list/1 就会走异常过滤器逻辑
+
+#### 案例 3:默认值
+
+`Parse* 管道`期望参数值是被定义的。当接收到 `null` 或者 `undefined` 值时，它们会抛出异常。
+为了允许端点处理丢失的查询字符串参数值，我们必须在 `Parse* 管道`对这些值进行操作之前注入默认值。DefaultValuePipe 提供了这种能力。
+只需在相关 `Parse* 管道`之前的 `@Query()` 装饰器中实例化 `DefaultValuePipe`，如下所示：
+
+```
+import { Controller, Get, Query, Post, Body, Patch, Param, Delete, ParseFloatPipe, ParseIntPipe, ParseUUIDPipe, ParseBoolPipe, DefaultValuePipe } from '@nestjs/common';
+import { ListService } from './list.service';
+
+@Controller('list')
+export class ListController {
+  constructor(private readonly listService: ListService) { }
+
+  // 访问 http://localhost:3000/list?flag=true&page=1
+  @Get()
+  findAll(
+    @Query("flag", new DefaultValuePipe(false), ParseBoolPipe) flag: boolean,
+    @Query("page", new DefaultValuePipe(0), ParseIntPipe) page: number,
+  ) {
+
+    console.log('flag', flag, page);
+
+    return this.listService.findAll();
+  }
+}
+```
+
+当我们访问 http://localhost:3000/list?flag=true&page=1 的时候，不会报错
+当我们访问 http://localhost:3000/list?flag=true，端点处理丢失的查询字符串参数值的情况下，默认会报错，new DefaultValuePipe()后就会默认带上默认值，从而不报错
+
+### 4.自定义管道
+
+先从一个简单的 ValidationPipe 开始
+
+validation.pipe.ts:
+
+```
+import { PipeTransform, Injectable, ArgumentMetadata } from '@nestjs/common';
+
+@Injectable()
+export class ValidationPipe implements PipeTransform {
+  transform(value: any, metadata: ArgumentMetadata) {
+    return value;
+  }
+}
+
+```
+
+为实现 `PipeTransfrom`，每个管道必须声明 `transfrom()` 方法。该方法有两个参数：
+
+`value`
+`metadata`
+`value` 参数是当前处理的方法参数(在被路由处理程序方法接收之前)，
+`metadata` 是当前处理的方法参数的元数据。元数据对象具有以下属性：
+
+```
+export interface ArgumentMetadata {
+  type: 'body' | 'query' | 'param' | 'custom';
+  metatype?: Type<unknown>;
+  data?: string;
+}
+
+```
+
+#### 案例 4：管道验证 DTO
+
+##### 1.前言
+
+让我们把验证管道变得更有用一点。仔细看看 CatsController 的 create() 方法，我们希望在该方法被调用之前，请求主体(post body)得到验证。
+
+```
+@Post()
+async create(@Body() createCatDto: CreateCatDto) {
+  this.catsService.create(createCatDto);
+}
+
+```
+
+注意到请求体参数为 createCatDto，其类型为 CreateCatDto :
+create-cat.dto.ts
+
+```
+export class CreateCatDto {
+  name: string;
+  age: number;
+  breed: string;
+}
+
+```
+
+我们希望任何被该方法接收的请求主体都是有效的，因此我们必须验证 createCatDto 对象的三个成员。我们可以在路由处理程序方法中执行此操作，但这样做并不理想，因为它会破坏`单一职责原则` (single responsibility rule, SRP)。
+
+另一种做法是创建一个验证类，把验证逻辑放在验证类中。这样做的缺点是我们必须要记得在每个该方法的前面，都调用一次验证类。
+
+那么写一个验证中间件呢？可以，但做不到创建一个能在整个应用程序上下文中使用的通用中间件。因为中间件不知道`执行上下文`(execution context)，包括将被调用的处理程序及其任何参数。
+
+管道就是为了处理这种应用场景而设计的。让我们继续完善我们的验证管道。
+
+##### 2.先创建一个 pipe 验证管道
+
+src/common/pipes/validation.pipe.ts:
+
+```
+nest g pi validation
+然后移动到conmmon目录下的pipes目录下
+```
+
+```
+import { PipeTransform, ArgumentMetadata } from "@nestjs/common"
+
+export class ValidationPipe implements PipeTransform {
+    transform(value: any, metadata: ArgumentMetadata) {
+        return value;
+    }
+
+}
+其中 value 就是DTO类型对象
+```
+
+##### 3.安装验证器
+
+Nest 与  [class-validator](https://github.com/typestack/class-validator)  配合得很好。这个优秀的库允许您使用基于装饰器的验证。装饰器的功能非常强大，尤其是与 Nest 的  **Pipe**  功能相结合使用时，因为我们可以通过访问  `metatype`  信息做很多事情，在开始之前需要安装一些依赖。
+
+```
+ npm i --save class-validator class-transformer
+```
+
+validation.pipe.ts:
+
+```
+import { PipeTransform, ArgumentMetadata, BadRequestException } from "@nestjs/common"
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
+// 手写一个 ValidationPipe
+export class ValidationPipe implements PipeTransform {
+    async transform(value: any, metadata: ArgumentMetadata) {
+        if (!metadata.metatype || !this.toValidate(metadata.metatype)) {
+            return value;
+        }
+        // 它的作用是将普通的 JavaScript 对象转换为特定类的实例（就是 DTO 类的实例）。
+        // 尽管 value 可能看起来已经是 DTO 对象，但实际上它只是一个普通的对象，没有任何与 DTO 类相关的方法或验证规则。
+        // 确保传入的数据被转换为特定类的实例，从而支持类验证和类型安全。
+        const DTO = plainToInstance(metadata.metatype, value);
+        console.log('value', value, "DTO", DTO);
+        // 通过 validate 验证 DTO 返回一个promise 的错误信息 如果有错误抛出
+        const errors = await validate(DTO);  //错误的arr
+        console.log("errors", errors);
+
+        if (errors.length > 0) {
+            throw new BadRequestException('Validation failed');
+        }
+        return value;
+    }
+    private toValidate(metatype: Function): boolean {
+        const types: Function[] = [String, Boolean, Number, Array, Object];
+        return !types.includes(metatype);
+    }
+}
+
+
+
+
+```
+
+list.controller.ts:
+
+```
+
+  // 自定义管道验证DTO
+  @Post()
+  create(@Body(ValidationPipe) createListDto: CreateListDto) {
+    console.log("createListDto", createListDto);
+    return this.listService.create(createListDto);
+  }
+```
+
+也可以全局设置：
+
+main.ts:
+
+```
+import { ValidationPipe } from "@nestjs/common";
+
+  // 全局ValidationPipe管道
+  app.useGlobalPipes(new ValidationPipe())
+```
