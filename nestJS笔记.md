@@ -2125,3 +2125,292 @@ import { ValidationPipe } from "@nestjs/common";
   // 全局ValidationPipe管道
   app.useGlobalPipes(new ValidationPipe())
 ```
+
+## 16. nestjs 守卫
+
+### 定义
+
+守卫是一个使用 `@Injectable() `装饰器的类。 守卫应该实现 `CanActivate `接口。
+
+守卫有一个单独的责任。它们根据运行时出现的某些条件（例如权限，角色，访问控制列表等）来确定给定的请求是否由路由处理程序处理。这通常称为授权。在传统的  `Express`  应用程序中，通常由中间件处理授权(以及认证)。中间件是身份验证的良好选择，因为诸如  `token`  验证或添加属性到  `request`  对象上与特定路由(及其元数据)没有强关联。
+
+中间件不知道调用  `next()`  函数后会执行哪个处理程序。另一方面，守卫可以访问  `ExecutionContext`  实例，因此确切地知道接下来要执行什么。它们的设计与异常过滤器、管道和拦截器非常相似，目的是让您在请求/响应周期的正确位置插入处理逻辑，并以声明的方式进行插入。这有助于保持代码的简洁和声明性。
+
+### 创建一个守卫
+
+```
+nest g gu [name]
+```
+
+roles.guard.ts
+
+```
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class RolesGuard implements CanActivate {
+    canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
+        console.log("经过了守卫");
+        return true
+    }
+}
+```
+
+### Controller 使用守卫
+
+roles.controller.ts
+
+```
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, SetMetadata } from '@nestjs/common';
+import { RolesService } from './roles.service';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+
+
+@Controller('roles')
+@UseGuards(RolesGuard)
+export class RolesController {
+  constructor(private readonly rolesService: RolesService) { }
+
+
+  // 一个简单例子
+  @Get()
+  // 不推荐直接这样写，建议应该创建你自己的装饰器。
+  // @SetMetadata('roles', ['admin']) //roles是前端key , ['admin'] 是一个特定的值 ，附加到 findAll() 方法
+
+  @Roles('admin')
+  findAll() {
+    return this.rolesService.findAll();
+  }
+
+}
+
+```
+
+### 全局守卫
+
+```
+app.useGlobalGuards(new RoleGuard())
+```
+
+### 针对角色控制守卫
+
+`SetMetadata` 装饰器
+
+第一个参数为 `key`，第二个参数自定义我们的例子是数组存放的权限
+
+#### 封装自定义装饰器
+
+```
+
+import { SetMetadata } from '@nestjs/common';
+
+export const Roles = (...roles: string[]) => SetMetadata('roles', roles); //roles是前端key , ['admin'] 是一个特定的值 ，附加到 findAll() 方法
+
+```
+
+roles.controller.ts:
+
+```
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, SetMetadata } from '@nestjs/common';
+import { RolesService } from './roles.service';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+
+
+@Controller('roles')
+@UseGuards(RolesGuard)
+export class RolesController {
+  constructor(private readonly rolesService: RolesService) { }
+
+
+  // 一个简单例子
+  @Get()
+  // 不推荐直接这样写，建议应该创建你自己的装饰器。
+  // @SetMetadata('roles', ['admin']) //roles是前端key , ['admin'] 是一个特定的值 ，附加到 findAll() 方法
+
+  @Roles('admin')
+  findAll() {
+    return this.rolesService.findAll();
+  }
+
+}
+
+```
+
+guard 使用 `Reflector` 反射读取 `setMetaData` 的值 去做判断这边例子是从 url 判断有没有 admin 权限
+
+roles.guard.ts：
+
+```
+
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common'
+import { Observable } from 'rxjs'
+import { Reflector } from '@nestjs/core'
+
+import type { Request } from 'express'
+@Injectable()
+export class RolesGuard implements CanActivate {
+  // 注入依赖  为了访问路由的角色(自定义元数据)，我们将使用在 @nestjs/core 中提供的 Reflector 帮助类。
+  constructor(private reflector: Reflector) {}
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
+    console.log('经过了守卫', context)
+
+    const roles = this.reflector.get<string[]>('roles', context.getHandler()) //与key对应
+    if (!roles) {
+      return true
+    }
+
+    const request = context.switchToHttp().getRequest<Request>()
+    if (roles.includes(request.query.role as string)) {
+      return true
+    } else {
+      return false
+    }
+  }
+}
+
+```
+
+当访问 http://localhost:3000/user?role=admin 时，会打印出经过了守卫，然后返回 true
+
+## 17.自定义装饰器
+
+`Nest` 是基于**装饰器**这种语言特性而创建的。在很多常见的编程语言中，装饰器是一个广为人知的概念，但在 `JavaScript` 世界中，这个概念仍然相对较新。所以为了更好地理解装饰器是如何工作的，你应该看看 [这篇](https://medium.com/google-developers/exploring-es7-decorators-76ecb65fb841) 文章。下面给出一个简单的定义：
+
+`ES2016` 装饰器是一个表达式，它返回一个可以将目标、名称和属性描述符作为参数的函数。通过在装饰器前面添加一个 `@` 字符并将其放置在你要装饰的内容的最顶部来应用它。可以为类、方法或属性定义装饰器。
+
+### 1.实现一个@Query 自定义装饰器
+
+本质上 装饰器是一个函数
+
+#### 前端 list 实体
+
+```
+
+list：
+{
+   name："keven",
+   age:18
+}
+```
+
+在 `Node.js` 中，会经常将需要传递的值加到请求对象的属性中。然后在每个路由处理程序中手动提取它们，使用如下代码：
+
+```
+  @Get()
+  find(@Req() req) {
+   console.log(req.list：)
+   return true
+  }
+```
+
+```
+const user = req.user;
+```
+
+#### 创建一个 list.decorator.ts 文件
+
+```
+import { createParamDecorator, ExecutionContext } from '@nestjs/common'
+
+export const List = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
+  const request = ctx.switchToHttp().getRequest()
+  return request.user
+})
+
+```
+
+#### 在 controller 中使用
+
+现在你可以在任何你想要的地方很方便地使用它。
+
+```
+@Get()
+find(@List() list: ListEntity) {
+  console.log(list);
+}
+```
+
+本质上就是实现一个@Query
+
+### 2.实现一个类似@Query()传参的装饰器
+
+```
+import { createParamDecorator, ExecutionContext } from '@nestjs/common'
+
+export const List = createParamDecorator((data: string, ctx: ExecutionContext) => {
+  const request = ctx.switchToHttp().getRequest()
+  //   return request.list
+
+  const list = request.list
+
+  return data ? list && list[data] : list
+})
+
+```
+
+然后，您可以通过控制器中的 @List() 装饰器访问以下特定属性：
+
+```
+@Get()
+ find(@List('name') name: string) {
+  console.log(`Hello ${name}`);
+}
+
+```
+
+
+
+### 3.使用管道
+
+
+
+`Nest` 对待自定义的路由参数装饰器和自身内置的装饰器（`@Body()`，`@Param()` 和 `@Query()`）一样。这意味着管道也会因为自定义注释参数（在本例中为 `user` 参数）而被执行。此外，你还可以直接将管道应用到自定义装饰器上：
+
+```
+@Get()
+async findOne(@User(new ValidationPipe()) user: UserEntity) {
+  console.log(user);
+}Copy to clipboardErrorCopied
+```
+
+> 请注意，`validateCustomDecorators` 选项必须设置为 `true`。默认情况下，`ValidationPipe` 不验证使用自定义装饰器注释的参数。
+
+
+
+### 4.装饰器聚合
+
+
+
+`Nest` 提供了一种辅助方法来聚合多个装饰器。例如，假设您要将与身份验证相关的所有装饰器聚合到一个装饰器中。这可以通过以下方法实现：
+
+```
+import { applyDecorators } from '@nestjs/common';
+
+export function Auth(...roles: Role[]) {
+  return applyDecorators(
+    SetMetadata('roles', roles),
+    UseGuards(AuthGuard, RolesGuard),
+    ApiBearerAuth(),
+    ApiUnauthorizedResponse({ description: 'Unauthorized"' })
+  );
+}Copy to clipboardErrorCopied
+```
+
+然后，你可以参照以下方式使用 `@Auth()` 自定义装饰器：
+
+```
+@Get('users')
+@Auth('admin')
+findAllUsers() {}Copy to clipboardErrorCopied
+```
+
+这具有通过一个声明应用所有四个装饰器的效果。
+
+> 来自 `@nestjs/swagger` 依赖中的 `@ApiHideProperty()` 装饰器无法聚合，因此此装饰器无法正常使用 `applyDecorators` 方法。
