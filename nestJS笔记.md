@@ -1821,7 +1821,7 @@ GatewayTimeoutException
 
 从客户端发送一个 `post` 请求，路径为：`/user/login`，请求参数为：`{userinfo: ‘xx’,password: ‘xx’}`，到服务器接收请求内容，触发绑定的函数并且执行相关逻辑完毕，然后返回内容给客户端的整个过程大体上要经过如下几个步骤：
 
-![alt text](image.png)
+![alt text](./imgs/image.png)
 
 ### 2.管道
 
@@ -2365,11 +2365,7 @@ export const List = createParamDecorator((data: string, ctx: ExecutionContext) =
 
 ```
 
-
-
 ### 3.使用管道
-
-
 
 `Nest` 对待自定义的路由参数装饰器和自身内置的装饰器（`@Body()`，`@Param()` 和 `@Query()`）一样。这意味着管道也会因为自定义注释参数（在本例中为 `user` 参数）而被执行。此外，你还可以直接将管道应用到自定义装饰器上：
 
@@ -2382,11 +2378,7 @@ async findOne(@User(new ValidationPipe()) user: UserEntity) {
 
 > 请注意，`validateCustomDecorators` 选项必须设置为 `true`。默认情况下，`ValidationPipe` 不验证使用自定义装饰器注释的参数。
 
-
-
 ### 4.装饰器聚合
-
-
 
 `Nest` 提供了一种辅助方法来聚合多个装饰器。例如，假设您要将与身份验证相关的所有装饰器聚合到一个装饰器中。这可以通过以下方法实现：
 
@@ -2414,3 +2406,478 @@ findAllUsers() {}Copy to clipboardErrorCopied
 这具有通过一个声明应用所有四个装饰器的效果。
 
 > 来自 `@nestjs/swagger` 依赖中的 `@ApiHideProperty()` 装饰器无法聚合，因此此装饰器无法正常使用 `applyDecorators` 方法。
+
+## 18. nestjs swagger 接口文档
+
+[OpenAPI](https://swagger.io/specification/)(Swagger)规范是一种用于描述  `RESTful API`  的强大定义格式。 `Nest`  提供了一个专用[模块](https://github.com/nestjs/swagger)来使用它。
+
+### [安装](https://docs.nestjs.cn/10/recipes?id=%e5%ae%89%e8%a3%85-4)
+
+首先，您必须安装所需的包：
+
+```
+pnpm install --save @nestjs/swagger swagger-ui-expressCopy to clipboardErrorCopied
+```
+
+如果你正在使用 `fastify` ，你必须安装 `fastify-swagger` 而不是 `swagger-ui-express` ：
+
+```
+pnpm install --save @nestjs/swagger fastify-swagger
+```
+
+main.ts
+
+```
+
+// swagger
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+
+
+  // swagger
+  const options = new DocumentBuilder()
+    .setTitle('API example')
+    .setDescription("api接口集合")
+    .setVersion("1.0")
+    .build()
+
+  const document = SwaggerModule.createDocument(app, options, {
+    ignoreGlobalPrefix: false //不忽略通过 setGlobalPrefix() 设置的路由的全局前缀
+  })
+
+  SwaggerModule.setup('/api-docs', app, document);  //  localhost:3000/api 访问
+```
+
+生成并下载 Swagger JSON 文件，只需在浏览器中导航到  `http://localhost:3000/api-docs-json` （如果您的 Swagger 文档是在  `http://localhost:3000/api-docs`  下）。 也可以将 json 导入到 apifox 中。
+
+### ApiTags - 路由分组
+
+使用`@ApiTags` 给每个 controller 添加分组
+
+比如 list.controller.ts
+
+```
+import { ApiTags } from "@nestjs/swagger";
+
+@Controller('list')
+@ApiTags("list")
+export class ListController {
+   ....
+}
+```
+
+![alt text](./imgs/image2.png)
+
+### ApiOperation 接口描述
+
+list.controller.ts:
+
+```
+  @Get(':id')
+  @ApiOperation({ summary: '获取列表', description: '这是一个获取id为xxx的列表' })
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    console.log("id", id, typeof id); //d485e074-e0f6-48ab-8ae1-51c11a8c1034 string
+    return this.listService.findOne(+id);
+  }
+```
+
+![alt text](./imgs/image5.png)
+
+### ApiParam 动态参数描述
+
+list.controller.ts:
+
+```
+  @Get(':id')
+  @ApiOperation({ summary: '获取列表', description: '这是一个获取id为xxx的列表' })
+  @ApiParam({ name: 'id', description: '列表id', type: 'string', example: "1" })
+
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    console.log("id", id, typeof id); //d485e074-e0f6-48ab-8ae1-51c11a8c1034 string
+    return this.listService.findOne(+id);
+  }
+```
+
+![alt text](./imgs/image6.png)
+
+### ApiQuery 修饰 get
+
+list.controller.ts:
+
+```
+  @Get()
+  @ApiQuery({ name: 'flag', description: '开关阈值', type: 'boolean', example: true, required: true })
+  @ApiQuery({ name: 'page', description: '页数', type: 'number', example: 10, required: true })
+  findAll(
+    @Query("flag", new DefaultValuePipe(false), ParseBoolPipe) flag: boolean,
+    @Query("page", new DefaultValuePipe(0), ParseIntPipe) page: number,
+  ) {
+
+    console.log('flag', flag, page);
+
+    return this.listService.findAll();
+  }
+
+```
+
+### ApiProperty -POST - DTO 参数
+
+```
+import { ApiProperty } from "@nestjs/swagger";
+export class CreateListDto {
+   @ApiProperty({ description: '姓名', example: "Bob" })
+    name: string;
+
+   @ApiProperty({ description: '年龄', example: 18 })
+    age: number;
+}
+
+```
+
+![alt text](./imgs/image4.png)
+![alt text](./imgs/image7.png)
+
+### ApiResponse 自定义返回信息
+
+```
+@ApiResponse({status:403,description:"自定义返回信息"})
+```
+
+![alt text](./imgs/image8.png)
+
+与异常过滤器部分中定义的常见 `HTTP` 异常相同，Nest 还提供了一组可重用的 **API 响应** ，这些响应继承自核心 `@ApiResponse` 装饰器：
+
+- `@ApiOkResponse()`
+- `@ApiCreatedResponse()`
+- `@ApiBadRequestResponse()`
+- `@ApiUnauthorizedResponse()`
+- `@ApiNotFoundResponse()`
+- `@ApiForbiddenResponse()`
+- `@ApiMethodNotAllowedResponse()`
+- `@ApiNotAcceptableResponse()`
+- `@ApiRequestTimeoutResponse()`
+- `@ApiConflictResponse()`
+- `@ApiGoneResponse()`
+- `@ApiPayloadTooLargeResponse()`
+- `@ApiUnsupportedMediaTypeResponse()`
+- `@ApiUnprocessableEntityResponse()`
+- `@ApiInternalServerErrorResponse()`
+- `@ApiNotImplementedResponse()`
+- `@ApiBadGatewayResponse()`
+- `@ApiServiceUnavailableResponse()`
+- `@ApiGatewayTimeoutResponse()`
+- `@ApiDefaultResponse()`
+
+```
+@Post()
+@ApiCreatedResponse({ description: 'The record has been successfully created.'})
+@ApiForbiddenResponse({ description: 'Forbidden.'})
+async create(@Body() createCatDto: CreateCatDto) {
+  this.catsService.create(createCatDto);
+}Copy to clipboardErrorCopied
+```
+
+要为请求指定返回模型，必须创建一个类并使用 `@ApiProperty()` 装饰器注释所有属性。
+
+```
+export class Cat {
+  @ApiProperty()
+  id: number;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  age: number;
+
+  @ApiProperty()
+  breed: string;
+}Copy to clipboardErrorCopied
+```
+
+之后，必须将 `Cat` 模型与响应装饰器的 `type` 属性结合使用。
+
+```
+@ApiTags('cats')
+@Controller('cats')
+export class CatsController {
+  @Post()
+  @ApiCreatedResponse({
+    description: 'The record has been successfully created.',
+    type: Cat
+  })
+  async create(@Body() createCatDto: CreateCatDto): Promise<Cat> {
+    return this.catsService.create(createCatDto);
+  }
+}
+```
+
+### ApiHeader HTTP 头字段
+
+list.controller.ts
+
+```
+@Controller('list')
+@ApiTags("list")
+@ApiHeader({
+  name: 'Authorization',
+  description: 'Auth token'
+})
+export class ListController { ...}
+```
+
+### ApiSecurity 安全性机制
+
+#### 安全
+
+要定义针对特定操作应使用的安全性机制，请使用 `@ApiSecurity()` 装饰器。
+
+```
+@ApiSecurity('basic')
+@Controller('list')
+export class ListController {}
+```
+
+在运行应用程序之前，请记住使用 `DocumentBuilder` 将安全性定义添加到您的基本文档中：
+
+```
+const options = new DocumentBuilder().addSecurity('basic', {
+  type: 'http',
+  scheme: 'basic'
+});
+```
+
+一些最流行的身份验证技术是预定义的（例如 `basic` 和 `bearer`），因此，您不必如上所述手动定义安全性机制。
+
+#### bssic 身份验证技术
+
+简化：
+使用 @ApiBasicAuth()。
+
+```
+
+@ApiBasicAuth()
+@Controller('list')
+export class ListController {}
+
+
+在运行应用程序之前，请记住使用 DocumentBuilder 将安全性定义添加到基本文档中：
+
+const options = new DocumentBuilder().addBasicAuth();
+```
+
+![alt text](./imgs/image9.png)
+
+![alt text](./imgs/image10.png)
+
+#### Bearer 身份验证技术
+
+为了使用 bearer 认证， 使用  `@ApiBearerAuth()`。
+
+```
+@ApiBearerAuth()
+@Controller('list')
+export class ListController {}
+```
+
+在运行应用程序之前，请记住使用 `DocumentBuilder` 将安全性定义添加到基本文档中：
+
+```
+const options = new DocumentBuilder().addBearerAuth();
+```
+
+![alt text](./imgs/image11.png)
+
+![alt text](./imgs/image12.png)
+
+#### [Cookie 认证](https://docs.nestjs.cn/10/recipes?id=cookie-%e8%ae%a4%e8%af%81)
+
+使用`@ApiCookieAuth()`来使能 cookie 认证。
+
+```
+@ApiCookieAuth()
+@Controller('cats')
+export class CatsController {}
+```
+
+在你运行应用前，记得使用`DocumentBuilder`来向你的基础文档添加安全定义。
+
+```
+const options = new DocumentBuilder().addCookieAuth('optional-session-id');
+```
+
+### ApiConsumes 文件上传
+
+可以使用  `@ApiBody`  装饰器和  `@ApiConsumes()`  为特定方法启用文件上载。 这里是使用[文件上传](https://docs.nestjs.com/techniques/file-upload)技术的完整示例：
+
+upload.controller.ts:
+
+```
+// UseInterceptors, UploadedFile
+import { Controller, Get, Post, UseInterceptors, UploadedFile } from '@nestjs/common'
+import { UploadService } from './upload.service'
+//
+import { FileInterceptor } from '@nestjs/platform-express'
+import { ApiTags, ApiConsumes, ApiBody } from "@nestjs/swagger";
+import { FileUploadDto } from './dto/file.dto';
+
+
+@Controller('upload')
+@ApiTags("upload")
+export class UploadController {
+  constructor(private readonly uploadService: UploadService) { }
+
+  // upload/album
+  @Post('album')
+  @UseInterceptors(FileInterceptor('file')) //与前端接口中字段匹配
+
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: '单个图片上传',
+    type: FileUploadDto,
+  })
+  uploadFile(@UploadedFile() file: FileUploadDto) {
+    //@UploadedFile()  装饰器从  request  中取出  file
+    console.log(file)
+
+    return {
+      code: 200,
+      data: file,
+    }
+  }
+}
+
+```
+
+FileUploadDto 如下所定义：
+
+```
+
+import { ApiProperty } from "@nestjs/swagger";
+
+export class FileUploadDto {
+    @ApiProperty({ type: 'string', format: 'binary' })
+    file: Express.Multer.File;
+}
+```
+
+![alt text](./imgs/image13.png)
+
+### 其他装饰器
+
+所有可用的 OpenAPI 装饰器都有一个 `Api` 前缀，可以清楚地区分核心装饰器。 以下是导出的装饰器的完整列表，以及可以应用装饰器的级别的名称。
+
+|                          |                     |
+| ------------------------ | ------------------- |
+| `@ApiOperation()`        | Method              |
+| `@ApiResponse()`         | Method / Controller |
+| `@ApiProduces()`         | Method / Controller |
+| `@ApiConsumes()`         | Method / Controller |
+| `@ApiBearerAuth()`       | Method / Controller |
+| `@ApiOAuth2()`           | Method / Controller |
+| `@ApiBasicAuth()`        | Method / Controller |
+| `@ApiSecurity()`         | Method / Controller |
+| `@ApiExtraModels()`      | Method / Controller |
+| `@ApiBody()`             | Method              |
+| `@ApiParam()`            | Method              |
+| `@ApiQuery()`            | Method              |
+| `@ApiHeader()`           | Method / Controller |
+| `@ApiExcludeEndpoint()`  | Method              |
+| `@ApiTags()`             | Method / Controller |
+| `@ApiProperty()`         | Model               |
+| `@ApiPropertyOptional()` | Model               |
+| `@ApiHideProperty()`     | Model               |
+| `@ApiExtension()`        | Model               |
+
+### [插件](https://docs.nestjs.cn/10/recipes?id=%e6%8f%92%e4%bb%b6)
+
+TypeScript 的元数据反射系统具有几个限制，这些限制使得例如无法确定类包含哪些属性或无法识别给定属性是可选属性还是必需属性。但是，其中一些限制可以在编译时解决。 Nest 提供了一个插件，可以增强 TypeScript 编译过程，以减少所需的样板代码量。
+
+该插件是**选择性**的。可以手动声明所有装饰器，也可以只声明需要的特定装饰器。
+
+Swagger 插件会自动：
+
+- 除非使用 `@ApiHideProperty`，否则用 `@ApiProperty` 注释所有 DTO 属性
+- 根据问号标记设置 `required` 属性（例如，`name?: string` 将设置 `required: false`）
+- 根据类型设置 `type` 或 `enum` 属性（也支持数组）
+- 根据分配的默认值设置 `default` 属性
+- 根据 `class-validator` 装饰器设置多个验证规则（如果 `classValidatorShim` 设置为 `true`）
+- 向具有正确状态和 `type`（响应模型）的每个端点添加响应装饰器
+
+请注意，你的文件名必须包含如下前缀之一：[‘.dto.ts’, ‘.entity.ts’] (例如, create-user.dto.ts) 从而能让插件对其进行分析。
+
+以前，如果您想通过 Swagger UI 提供交互式体验，您必须重复很多代码，以使程序包知道应如何在规范中声明您的模型/组件。例如，您可以定义一个简单的 `CreateUserDto` 类，如下所示：
+
+```
+export class CreateUserDto {
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty()
+  password: string;
+
+  @ApiProperty({ enum: RoleEnum, default: [], isArray: true })
+  roles: RoleEnum[] = [];
+
+  @ApiProperty({ required: false, default: true })
+  isEnabled?: boolean = true;
+}Copy to clipboardErrorCopied
+```
+
+尽管对于中型项目而言这并不是什么大问题，但是一旦您拥有大量的类，它就会变得冗长而笨拙。
+
+现在，在启用 Swagger 插件的情况下，可以简单地声明上述类定义：
+
+```
+export class CreateUserDto {
+  email: string;
+  password: string;
+  roles: RoleEnum[] = [];
+  isEnabled?: boolean = true;
+}Copy to clipboardErrorCopied
+```
+
+该插件会基于**抽象语法树**动态添加适当的装饰器。因此，您不必再为分散在整个项目中的 `@ApiProperty` 装饰器而苦恼。
+
+启用该插件，只需打开 `nest-cli.json`（如果使用[Nest CLI](https://docs.nestjs.cn/cli/overview)) 并添加以下`plugins`配置：
+
+```
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "plugins": ["@nestjs/swagger/plugin"]
+  }
+}Copy to clipboardErrorCopied
+```
+
+您可以使用 `options` 属性来自定义插件的行为。
+
+```
+"plugins": [
+  {
+    "name": "@nestjs/swagger/plugin",
+    "options": {
+      "classValidatorShim": false
+    }
+  }
+]Copy to clipboardErrorCopied
+```
+
+`options` 属性必须满足以下接口：
+
+```
+export interface PluginOptions {
+  dtoFileNameSuffix?: string[];
+  controllerFileNameSuffix?: string[];
+  classValidatorShim?: boolean;
+}
+```
+
+| 选项(Option)               | 默认(Default)               | 描述(Description)                                                                                                |
+| -------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `dtoFileNameSuffix`        | `['.dto.ts', '.entity.ts']` | DTO（数据传输对象）文件后缀                                                                                      |
+| `controllerFileNameSuffix` | `.controller.ts`            | 控制器文件后缀                                                                                                   |
+| `classValidatorShim`       | `true`                      | 如果设置为 true，则模块将重用 `class-validator` 验证装饰器 (例如 `@Max(10)` 会将 `max: 10` 添加到 schema 定义中) |
+
+## 19 nestjs 连接数据库
+
