@@ -2879,5 +2879,8 @@ export interface PluginOptions {
 | `controllerFileNameSuffix` | `.controller.ts`            | 控制器文件后缀                                                                                                   |
 | `classValidatorShim`       | `true`                      | 如果设置为 true，则模块将重用 `class-validator` 验证装饰器 (例如 `@Max(10)` 会将 `max: 10` 添加到 schema 定义中) |
 
-## 19 nestjs 连接数据库
+## 19 nestjs 连接数据库 && TypeORM
 
+`Nestjs` 集成数据库，由于企业用的`Mysql` 居多 我们就用`Nestjs` 连接 `Mysql`
+
+### 1.安装 mysql
