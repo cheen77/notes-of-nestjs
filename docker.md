@@ -82,17 +82,17 @@ Docker 容器通过 Docker 镜像来创建。
 
 #### 3.文本内容处理
 
-| 命令                 | 解析                                                         |
-| -------------------- | ------------------------------------------------------------ |
-| grep str /tmp/test   | 在文件 ‘/tmp/test’ 中查找 “str”                              |
-| grep ^str /tmp/test  | 在文件 ‘/tmp/test’ 中查找以 “str” 开始的行                   |
-| grep [0-9] /tmp/test | 查找 ‘/tmp/test’ 文件中所有包含数字的行                      |
-| grep str -r /tmp/\*  | 在目录 ‘/tmp’ 及其子目录中查找 “str”                         |
-| diff file1 file2     | 找出两个文件的不同处                                         |
-| sdiff file1 file2    | 以对比的方式显示两个文件的不同                               |
+| 命令                 | 解析                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| grep str /tmp/test   | 在文件 ‘/tmp/test’ 中查找 “str”                                                                          |
+| grep ^str /tmp/test  | 在文件 ‘/tmp/test’ 中查找以 “str” 开始的行                                                               |
+| grep [0-9] /tmp/test | 查找 ‘/tmp/test’ 文件中所有包含数字的行                                                                  |
+| grep str -r /tmp/\*  | 在目录 ‘/tmp’ 及其子目录中查找 “str”                                                                     |
+| diff file1 file2     | 找出两个文件的不同处                                                                                     |
+| sdiff file1 file2    | 以对比的方式显示两个文件的不同                                                                           |
 | vi file              | 操作解析 i 进入编辑文本模式 Esc 退出编辑文本模式:w 保存当前修改:q 不保存退出 vi:wq 保存当前修改并退出 vi |
-| rz                   | 运行该命令会弹出一个文件选择窗口，从本地选择文件上传到Linux服务器 |
-| sz filename          | 将选定的文件发送（send）到本地机器。                         |
+| rz                   | 运行该命令会弹出一个文件选择窗口，从本地选择文件上传到 Linux 服务器                                      |
+| sz filename          | 将选定的文件发送（send）到本地机器。                                                                     |
 
 #### 4.查询操作
 
@@ -297,6 +297,7 @@ sudo mkdir -p /etc/docker
 sudo tee /etc/docker/daemon.json <<-'EOF'
 {
 "registry-mirrors": [
+"https://docker.1ms.run",
 "https://do.nark.eu.org",
 "https://dc.j8.work",
 "https://docker.m.daocloud.io",
@@ -421,7 +422,7 @@ docker push chenjw1212/chennginx:latest
 
 #### 解决办法
 
-##### 1.linux 主机目录挂载：
+##### 1.目录挂载：
 
 ```sh
 -v /app/nghtml:/usr/share/nginx/html
@@ -442,8 +443,8 @@ docker push chenjw1212/chennginx:latest
 
 两种方式，注意区分：
 
-- 目录挂载： `-v /app/nghtml:/usr/share/nginx/html` ，/app/nghtml 是目录位置，容器初始启动，目录下是空的，需要手动创建对应的文件
-- 卷映射：`-v ngconf:/etc/nginx` ，ngconf 是卷名，docker 会自动创建一个存储位置，容器初始启动，如果有卷：卷内容会自动映射到容器内，不需要手动创建对应的文件 ， 如果没卷 ， 容器内容会映射到卷内。
+- 目录挂载： `-v /app/nghtml:/usr/share/nginx/html` ，/app/nghtml 是目录位置，目录挂载是以外部文件为准，容器初始启动，如果外部目录下是空的，则容器内对应文件是空的
+- 卷映射：`-v ngconf:/etc/nginx` ，ngconf 是卷名，docker 会自动创建一个存储位置， 以容器内部文件夹为准， 容器初始启动，如果内部有数据会自动映射到外部
 
 ```sh
 docker run -d -p 99:80 \
@@ -582,7 +583,7 @@ docker run -d -p 3306:3306 \
 mysql:8.0.37-debian
 ```
 
-### 5.Docker Compose管理容器
+### 5.Docker Compose 管理容器
 
 #### 1.介绍
 
@@ -643,11 +644,11 @@ docker run -d -p 8080:80 \
 wordpress:latest
 ```
 
---restart always --name mysql 容器随着docker启动而启动
+--restart always --name mysql 容器随着 docker 启动而启动
 
-##### 2. 配置 compose.yaml 
+##### 2. 配置 compose.yaml
 
-docker compose  api：https://docs.docker.com/reference/compose-file/
+docker compose api：https://docs.docker.com/reference/compose-file/
 
 顶级元素
 
@@ -704,9 +705,7 @@ networks:
   blog:
 ```
 
-
-
-~~~~sh
+```sh
 #编辑文件（没有则创建）
 vim aaa.yaml
 #查看列表
@@ -721,7 +720,7 @@ docker network ls
 docker network rm blog
 #后台启动compose文件
 docker compose -f aaa.yaml up -d
-~~~~
+```
 
 #### 4.特性
 
@@ -733,37 +732,280 @@ docker compose -f aaa.yaml up -d
 
 - - 默认就算 down 了容器，所有挂载的卷不会被移除。比较安全
 
-### 6.Dockerfile制作镜像
+### 6.Dockerfile 制作镜像
 
 https://docs.docker.com/reference/dockerfile/
 
 ##### 1.图解
 
-制作镜像主要考虑 `基础环境`  `软件包`  `启动命令`等
+制作镜像主要考虑 `基础环境` `软件包` `启动命令`等
 
 ![alt text](./imgs/image30.png)
 
+##### 2.实现指令
 
+| 常见指令       | 作用                                                         |
+| :------------- | ------------------------------------------------------------ |
+| **FROM**       | **指定镜像基础环境**                                         |
+| RUN            | 运行自定义命令，等同于终端shell命令                          |
+| CMD            | 容器启动命令或参数                                           |
+| **LABEL**      | **自定义标签**                                               |
+| **EXPOSE**     | **指定当前容器对外暴露的端口**                               |
+| ENV            | 环境变量                                                     |
+| ADD            | 将宿主机目录下的文件拷贝到镜像且会自动处理URL和解压tar压缩包 |
+| **COPY**       | 类似ADD，拷贝文件和目录到镜像中。将从构建上下文目录中<源路径>的文件或目录复制到新的一层的镜像内的<目标路径> |
+| **ENTRYPOINT** | **容器固定启动命令**                                         |
+| VOLUME         | 数据卷                                                       |
+| USER           | 指定该镜像以什么样的用户去执行，（不指定为root）             |
+| WORLDIR        | 指定在创建容器后，终端默认登录进来的工作目录                 |
+| ARG            | 指定构建参数                                                 |
 
-##### 2.实现指令 
+##### RUN
 
-| 常见指令       | 作用                 |
-| :------------- | -------------------- |
-| **FROM**       | **指定镜像基础环境** |
-| RUN            | 运行自定义命令       |
-| CMD            | 容器启动命令或参数   |
-| **LABEL**      | **自定义标签**       |
-| **EXPOSE**     | **指定暴露端口**     |
-| ENV            | 环境变量             |
-| ADD            | 添加文件到镜像       |
-| **COPY**       | **复制文件到镜像**   |
-| **ENTRYPOINT** | **容器固定启动命令** |
-| VOLUME         | 数据卷               |
-| USER           | 指定用户和用户组     |
-| WORLDIR        | 指定默认工作目录     |
-| ARG            | 指定构建参数         |
+  容器启动命令或参数 
+
+ 格式：
+
+- shell格式
+- exec格式 
 
 ~~~~sh
+RUN ["可执行文件"，"参数1"，"参数2" ]
+# 比如：
+RUN ["java","-jar",".app.jar"] 等价 RUN java -jar /app.jar
+~~~~
+
+
+
+RUN是在docker build的时候运行
+
+
+
+##### ENV
+
+~~~~sh
+ENV HOME /user
+
+WORLDIR $HOME
+~~~~
+
+
+
+##### ADD COPY
+
+
+
+
+
+###### 1.ADD
+
+~~~~sh
+#ADD <src>... <dest>
+#ADD支持URL作为参数
+ADD /foo.tar.gz /tmp/
+
+ADD http://foo.com/bar.go /tmp/
+~~~~
+
+###### 2.COPY
+
+~~~~~sh
+#COPY <src>... <dest>
+#COPY不支持URL作为参数，因此它不能用于从远程位置下载文件。任何想要复制到容器中的东西都必须存在于本地构建上下文中。
+#COPY实际上只是ADD的精简版本，旨在满足大部分“复制文件到容器”的使用案例而没有任何副作用
+
+#将从构建上下文目录中<源路径>的文件或目录复制到新的一层的镜像内的<目标路径>
+# <src源路径> :源文件或源目录      <dest目标路径>：容器内的指定路径，该路径不用事先建好，会自动创建
+COPY src dest
+copy ["src" ,"dest"]
+~~~~~
+
+###### 3.ADD vs COPY
+
+COPY实际上只是ADD的精简版本，旨在满足大部分“复制文件到容器”的使用案例而没有任何副作用 .
+
+Docker团队的建议是在几乎所有情况下都使用COPY .
+
+ADD支持URL作为参数，CPOY不支持
+
+使用ADD的唯一原因是当你有一个压缩文件，你一定想自动解压到镜像中 ,其他时候推荐用COPY
+
+
+
+#### ENTRYPOINT  CMD
+
+
+
+###### 1.CMD
+
+**定义:**
+
+该指令用于用户启动容器时，容器来执行的命令，该命令会在容器启动且` docker run `后面没有指定其他命令时执行，所以小结三种情况：
+
+- docker run 没指定其他命令：则启动容器时运行 `CMD` 后的命令；
+
+- docker run 指定了其他命令：则启动容器时运行` CMD` 后的命令会被覆盖；
+
+- Dockerfile 中有多条 `CMD` 指令时，仅最后一条生效。
+
+  
+
+**格式**：
+
+- shell 格式：`CMD <二进制可执行命令> <指令1> <指令2> `如：`CMD yum install -y vim`
+
+- exec 格式：`CMD [“二进制可执行命令”, “指令1”, “指令2”]` 如：`CMD [“yum”, “install”, “-y”, “net-tools”]`
+
+`CMD [“a”,“b”] `格式：该格式是为` ENTRYPOINT` 提供使用，此时` ENTRYPOINT` 就必须使用 `exec `格式，否则不生效。
+
+**其他:**
+
+- `CMD` [ "参数1","参数2",...]，在指定了` RNTRYPOINT` 指令后，用` CMD `指定具体的参数
+- `CMD是`在`docker run`的时候执行 , `RUN是`在`docker build`的时候执行
+
+**理解:**
+
+~~~~sh
+#在host主机中,如果我们需要执行一个nginx环境,
+docker run -it nginx /bin/bash
+
+#转化为Dockerfile写法就是
+CMD ["/bin/bash", "start.bash"]
+
+#理解: CMD指令其实就是docker run 后面追加的命令
+#Dockerfile的CMD ["/bin/bash", "start.bash"] 转化到宿主机中就是  docker run -it nginx /bin/bash
+
+
+#又比如  我想启动 nginx 并且想看  /etc/nginx/new.conf 目录
+
+#宿主机操作
+docker run -it nginx cat /etc/nginx/new.conf 
+#Dockerfile写法
+CMD ["cat"," /etc/nginx/new.conf"]
+
+~~~~
+
+
+
+**容器内运行程序**
+
+这里要注意:`docker`不是虚拟机的概念,虚拟机里的程序运行,基本上都是在后台运行,利用`systemctl`运行,但是容器内没有后台进程的概念,必须是**前台**运行
+
+容器就是为了主进程而存在的,主进程如果退出了,容器也就失去了意义,自动退出
+
+
+
+例如这里有一个经典问题
+
+~~~~~sh
+#这种写法是错误的,当你docker run 的时候 容器会立即退出,
+CMD systemctl start nginx
+#因为systemctl start nginx是希望以守护进程形式启动nginx,且CMD命令会转化为
+CMD ["sh","-c","systemctl start nginx"]
+#这样的命令主进程是sh解释器,执行完毕后立即结束了.因此容器也就退出了.
+
+#因此正确的做法应该是 ,让nginx前台运行
+CMD ["nginx","-g","daemon off"]  
+CMD nginx -g daemon 0ff
+~~~~~
+
+
+
+
+
+###### 2.ENTRYPOINT	
+
+**定义:**
+
+与`CMD`类似,该指令用于用户启动容器时，容器来执行的命令。与`CMD `不同的是，不管 `docker run … `后是否运行有其他命令，`ENTRYPOINT` 指令后的命令一定会被执行。
+
+**格式：**
+
+- shell 格式：`ENTRYPOINT command param1 param2`；
+
+- exec 格式：`ENTRYPOINT ["executable", "param1", "param2"]`。
+
+**其他:**
+
+- 类似于 CMD 指令 ,但是 ENTRYPOINT 不会被docker run 后面的命令覆盖,而且这些命令行参数会被当作参数传给 ENTRYPOINT 指令指定的程序
+- 也是用来指定一个容器启动时要运行的命令
+
+- `ENTRYPOINT` 可以和` CMD` 一起用 , 一般是变参才会用`CMD`,这里的`CMD `等于是在给` ENTRYPOINT` 传参.
+- 当指定了 `ENTRYPOINT` 后,`CMD`的含义就发生了变化,不再是直接运行其命令而是将`CMD`的内容作为参数传递给`ENTRYPOINT`指令.
+
+
+
+**理解:**
+
+~~~~sh
+# 当指定了 ENTRYPOINT 后,CMD的含义就发生了变化,不再是直接运行其命令而是将CMD的内容作为参数传递给ENTRYPOINT指令.
+
+
+#CMD版本
+
+#1.准备一个Dockerfile 目的是查看主机ip
+FROM centos:7.8.2003
+RUN rpm --rebuilddb && yum install epel-release -y
+RUN rpm --rebuilddb %% yum install curl -y
+CMD ["curl","-s","http://ipinfo.io/ip"]
+
+#CMD命令就是 
+docker run my_centos curl -s http://ipinfo.io/ip
+
+#2.进入宿主机,复制进去,然后esc + :wq
+vim Dockerfile 
+#3.构建镜像
+docker build -f Dockerfile -t my_centos:v1.0 .
+#4.检查镜像
+docker images
+#5.运行镜像 生成容器
+docker run my_centos:v1.0
+#6. curl -s http://ipinfo.io/ip -I 参数,如果我突然想传 -I这个命令参数,发现报错怎么办?
+docker run my_centos:v1.0 -I
+#这是因为CMD指令下,docker run ... 后面的命令 -I 会覆盖掉 Dockerfile中的CMD中["curl","-s","http://ipinfo.io/ip"]  ,造成报错
+docker run my_centos:v1.0 curl -s http://ipinfo.io/ip -I   
+# 这样才行,但是太麻烦
+
+# 想要正确的给容器传入一个 -I 参数怎么办?
+
+# 解决办法 使用 ENTRYPOINT 
+
+
+
+
+# ENTRYPOINT版本
+
+#9.修改Dockerfile文件
+FROM centos:7.8.2003
+RUN rpm --rebuilddb && yum install epel-release -y
+RUN rpm --rebuilddb %% yum install curl -y
+ENTRYPOINT ["curl","-s","http://ipinfo.io/ip"]
+#10.进入宿主机,复制进去,然后esc + :wq
+vim Dockerfile 
+#11.重新构建镜像
+docker build -f Dockerfile -t my_centos:v2.0 .
+#12.检查镜像
+docker images
+#13.运行镜像 生成容器
+docker run my_centos:v2.0 -I
+#等价于  将 -I 插入到  ENTRYPOINT ["curl","-s","http://ipinfo.io/ip" , "-I"],而不是CMD的覆盖
+~~~~
+
+
+
+###### 3. CMD vs ENTRYPOINT
+
+~~~~sh
+CMD指令和ENTRYPOINT指令其实本质上都是shell脚本,都是在docker run ..后面追加的参数,也可以把这个参数理解为Dockerfile的脚本
+但是CMD指令下,如果docker run  nginx bash ,这个bash参数会覆盖掉dockerfile中的CMD指令
+而ENTRYPOINT指令下,如果dicker run nginx bash 这个bash指令不会覆盖ENTRYPOINT指令
+~~~~
+
+
+
+##### 3.Dockerfile小案例
+
+```sh
 #Dockerfile:
 
 FROM openjdk:17
@@ -786,5 +1028,6 @@ ls
 cat Dockerfile
 #制作镜像    最后的 . 代表根目录  对应  /app.jar
 docker build -f Dockerfile -t myjavaapp:v1.0 .
-~~~~
+```
 
+![alt text](./imgs/image31.png)
