@@ -272,7 +272,7 @@ sudo yum-config-manager \
 http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
 
 
-# 安装 最新 docker
+# 安装 最新 docker docker-compose等
 
 sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
