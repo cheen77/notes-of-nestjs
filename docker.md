@@ -1,4 +1,4 @@
-## 1.Docker 简介
+##  1.Docker 简介
 
 ### 1.介绍
 
@@ -832,7 +832,7 @@ ADD支持URL作为参数，CPOY不支持
 
 
 
-#### ENTRYPOINT  CMD
+##### ENTRYPOINT  CMD
 
 
 
@@ -1003,6 +1003,83 @@ CMD指令和ENTRYPOINT指令其实本质上都是shell脚本,都是在docker run
 
 
 
+##### ARG && ENV
+
+
+
+###### ARG  构建参数
+
+格式：`ARG <参数名>[=<默认值>]` 
+
+定义变量，作用于docker build的时候
+
+```sh
+ARG DOCKER_USERNAME=library
+
+FROM ${DOCKER_USERNAME}/alpine
+
+RUN set -x ; echo ${DOCKER_USERNAME}
+```
+
+使用上述 Dockerfile 会发现无法输出 `${DOCKER_USERNAME}` 变量的值，要想正常输出，你必须在 `FROM` 之后再次指定 `ARG`
+
+```sh
+# 只在 FROM 中生效
+ARG DOCKER_USERNAME=library
+
+FROM ${DOCKER_USERNAME}/alpine
+
+# 要想在 FROM 之后使用，必须再次指定
+ARG DOCKER_USERNAME=library
+
+RUN set -x ; echo ${DOCKER_USERNAME}
+```
+
+or
+
+~~~~sh
+# 只在 FROM 中生效
+ARG DOCKER_USERNAME=library
+
+FROM ${DOCKER_USERNAME}/alpine
+
+# 要想在 FROM 之后使用，必须再次指定
+ARG DOCKER_USERNAME
+
+RUN set -x ; echo ${DOCKER_USERNAME}
+~~~~
+
+这样就依赖于 `docker build  --build-arg <参数名>=<值> `,满足构建时定制化
+
+~~~~sh
+docker build --build-arg DOCKER_USERNAME=library .
+~~~~
+
+
+
+
+
+###### ENV 设置环境变量
+
+格式有两种：
+
+- `ENV <key> <value>`
+- `ENV <key1>=<value1> <key2>=<value2>...`
+
+定义环境变量，作用于容器已经构建好之后。
+
+下列指令可以支持环境变量展开： `ADD`、`COPY`、`ENV`、`EXPOSE`、`FROM`、`LABEL`、`USER`、`WORKDIR`、`VOLUME`、`STOPSIGNAL`、`ONBUILD`、`RUN`。
+
+
+
+###### 区别
+
+`ARG` 是在 `build `的时候存在的, 可以在 `Dockerfile `中当做变量来使用
+
+`ENV` 是容器构建好之后的环境变量, 不能在` Dockerfile` 中当参数使用
+
+
+
 ##### 3.Dockerfile小案例
 
 ```sh
@@ -1031,3 +1108,313 @@ docker build -f Dockerfile -t myjavaapp:v1.0 .
 ```
 
 ![alt text](./imgs/image31.png)
+
+
+
+### 7. 一键安装超多中间件 
+
+
+
+#### 7.1 yaml
+
+
+
+注意：
+
+- 将下面文件中 `kafka` 的  `119.45.147.122` 改为你自己的服务器IP。
+- 所有容器都做了时间同步，这样容器的时间和linux主机的时间就一致了
+
+准备一个 `compose.yaml`文件，内容如下：
+
+~~~~sh
+name: devsoft
+services:
+  redis:
+    image: bitnami/redis:latest
+    restart: always
+    container_name: redis
+    environment:
+      - REDIS_PASSWORD=123456
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/bitnami/redis/data
+      - redis-conf:/opt/bitnami/redis/mounted-etc
+      - /etc/localtime:/etc/localtime:ro
+
+  mysql:
+    image: mysql:8.0.31
+    restart: always
+    container_name: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+    ports:
+      - '3306:3306'
+      - '33060:33060'
+    volumes:
+      - mysql-conf:/etc/mysql/conf.d
+      - mysql-data:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+
+  rabbit:
+    image: rabbitmq:3-management
+    restart: always
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=rabbit
+      - RABBITMQ_DEFAULT_PASS=rabbit
+      - RABBITMQ_DEFAULT_VHOST=dev
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+      - rabbit-app:/etc/rabbitmq
+      - /etc/localtime:/etc/localtime:ro
+  opensearch-node1:
+    image: opensearchproject/opensearch:2.13.0
+    container_name: opensearch-node1
+    environment:
+      - cluster.name=opensearch-cluster # Name the cluster
+      - node.name=opensearch-node1 # Name the node that will run in this container
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2 # Nodes to look for when discovering the cluster
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 # Nodes eligibile to serve as cluster manager
+      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set min and max JVM heap sizes to at least 50% of system RAM
+      - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevents execution of bundled demo script which installs demo certificates and security configurations to OpenSearch
+      - "DISABLE_SECURITY_PLUGIN=true" # Disables Security plugin
+    ulimits:
+      memlock:
+        soft: -1 # Set memlock to unlimited (no soft or hard limit)
+        hard: -1
+      nofile:
+        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        hard: 65536
+    volumes:
+      - opensearch-data1:/usr/share/opensearch/data # Creates volume called opensearch-data1 and mounts it to the container
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 9200:9200 # REST API
+      - 9600:9600 # Performance Analyzer
+
+  opensearch-node2:
+    image: opensearchproject/opensearch:2.13.0
+    container_name: opensearch-node2
+    environment:
+      - cluster.name=opensearch-cluster # Name the cluster
+      - node.name=opensearch-node2 # Name the node that will run in this container
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2 # Nodes to look for when discovering the cluster
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 # Nodes eligibile to serve as cluster manager
+      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set min and max JVM heap sizes to at least 50% of system RAM
+      - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevents execution of bundled demo script which installs demo certificates and security configurations to OpenSearch
+      - "DISABLE_SECURITY_PLUGIN=true" # Disables Security plugin
+    ulimits:
+      memlock:
+        soft: -1 # Set memlock to unlimited (no soft or hard limit)
+        hard: -1
+      nofile:
+        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        hard: 65536
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - opensearch-data2:/usr/share/opensearch/data # Creates volume called opensearch-data2 and mounts it to the container
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.13.0
+    container_name: opensearch-dashboards
+    ports:
+      - 5601:5601 # Map host port 5601 to container port 5601
+    expose:
+      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+    environment:
+      - 'OPENSEARCH_HOSTS=["http://opensearch-node1:9200","http://opensearch-node2:9200"]'
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true" # disables security dashboards plugin in OpenSearch Dashboards
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: 'bitnami/kafka:3.4'
+    container_name: kafka
+    restart: always
+    hostname: kafka
+    ports:
+      - '9092:9092'
+      - '9094:9094'
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://0.0.0.0:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://119.45.147.122:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - "KAFKA_HEAP_OPTS=-Xmx512m -Xms512m"
+    volumes:
+      - kafka-conf:/bitnami/kafka/config
+      - kafka-data:/bitnami/kafka/data
+      - /etc/localtime:/etc/localtime:ro
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    restart: always
+    ports:
+      - 8080:8080
+    environment:
+      DYNAMIC_CONFIG_ENABLED: true
+      KAFKA_CLUSTERS_0_NAME: kafka-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    volumes:
+      - kafkaui-app:/etc/kafkaui
+      - /etc/localtime:/etc/localtime:ro
+
+  nacos:
+    image: nacos/nacos-server:v2.3.1
+    container_name: nacos
+    ports:
+      - 8848:8848
+      - 9848:9848
+    environment:
+      - PREFER_HOST_MODE=hostname
+      - MODE=standalone
+      - JVM_XMX=512m
+      - JVM_XMS=512m
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=nacos-mysql
+      - MYSQL_SERVICE_DB_NAME=nacos_devtest
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_USER=nacos
+      - MYSQL_SERVICE_PASSWORD=nacos
+      - MYSQL_SERVICE_DB_PARAM=characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - NACOS_AUTH_IDENTITY_KEY=2222
+      - NACOS_AUTH_IDENTITY_VALUE=2xxx
+      - NACOS_AUTH_TOKEN=SecretKey012345678901234567890123456789012345678901234567890123456789
+      - NACOS_AUTH_ENABLE=true
+    volumes:
+      - /app/nacos/standalone-logs/:/home/nacos/logs
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      nacos-mysql:
+        condition: service_healthy
+  nacos-mysql:
+    container_name: nacos-mysql
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM mysql:8.0.31
+        ADD https://raw.githubusercontent.com/alibaba/nacos/2.3.2/distribution/conf/mysql-schema.sql /docker-entrypoint-initdb.d/nacos-mysql.sql
+        RUN chown -R mysql:mysql /docker-entrypoint-initdb.d/nacos-mysql.sql
+        EXPOSE 3306
+        CMD ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    image: nacos/mysql:8.0.30
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=nacos_devtest
+      - MYSQL_USER=nacos
+      - MYSQL_PASSWORD=nacos
+      - LANG=C.UTF-8
+    volumes:
+      - nacos-mysqldata:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    restart: always
+    ports:
+      - 9090:9090
+    volumes:
+      - prometheus-data:/prometheus
+      - prometheus-conf:/etc/prometheus
+      - /etc/localtime:/etc/localtime:ro
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    restart: always
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - /etc/localtime:/etc/localtime:ro
+
+volumes:
+  redis-data:
+  redis-conf:
+  mysql-conf:
+  mysql-data:
+  rabbit-data:
+  rabbit-app:
+  opensearch-data1:
+  opensearch-data2:
+  nacos-mysqldata:
+  zookeeper_data:
+  kafka-conf:
+  kafka-data:
+  kafkaui-app:
+  prometheus-data:
+  prometheus-conf:
+  grafana-data:
+~~~~
+
+
+
+#### 7.2. 启动
+
+~~~~sh
+# 在 compose.yaml 文件所在的目录下执行
+docker compose up -d
+# 等待启动所有容器
+~~~~
+
+tip：如果重启了服务器，可能有些容器会启动失败。再执行一遍 `docker compose up -d`即可。所有程序都可运行成功，并且不会丢失数据。请放心使用。 
+
+
+
+#### 7.3. 访问
+
+
+
+## 7.3. 
+
+- zookeeper可视化工具下载：
+
+- - <https://github.com/vran-dev/PrettyZoo/releases/download/v2.1.1/prettyZoo-win.zip>
+
+- redis可视化工具下载：
+
+- - <https://github.com/qishibo/AnotherRedisDesktopManager/releases/download/v1.6.4/Another-Redis-Desktop-Manager.1.6.4.exe>
+
+| 组件（容器名）                 | 介绍            | 访问地址                  | 账号/密码          | 特性                |
+| ------------------------------ | --------------- | ------------------------- | ------------------ | ------------------- |
+| Redis(redis)                   | k-v 库          | 你的ip:6379               | 单密码模式：123456 | 已开启AOF           |
+| MySQL(mysql)                   | 数据库          | 你的ip:3306               | root/123456        | 默认utf8mb4字符集   |
+| Rabbit(rabbit)                 | 消息队列        | 你的ip:15672              | rabbit/rabbit      | 暴露5672和15672端口 |
+| OpenSearch(opensearch-node1/2) | 检索引擎        | 你的ip:9200               |                    | 内存512mb；两个节点 |
+| opensearch-dashboards          | search可视化    | 你的ip:5601               |                    |                     |
+| Zookeeper(zookeeper)           | 分布式协调      | 你的ip:2181               |                    | 允许匿名登录        |
+| kafka(kafka)                   | 消息队列        | 你的ip:9092 外部访问:9094 |                    | 占用内存512mb       |
+| kafka-ui(kafka-ui)             | kafka可视化     | 你的ip:8080               |                    |                     |
+| nacos(nacos)                   | 注册/配置中心   | 你的ip:8848               | nacos/nacos        | 持久化数据到MySQL   |
+| nacos-mysql(nacos-mysql)       | nacos配套数据库 | 你的ip:13306              | root/root          |                     |
+| prometheus(prometheus)         | 时序数据库      | 你的ip:9090               |                    |                     |
+| grafana(grafana)               |                 | 你的ip:3000               | admin/admin        |                     |
+|                                |                 |                           |                    |                     |
