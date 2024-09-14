@@ -2883,4 +2883,250 @@ export interface PluginOptions {
 
 `Nestjs` 集成数据库，由于企业用的`Mysql` 居多 我们就用`Nestjs` 连接 `Mysql`
 
-### 1.安装 mysql
+### 1.安装 mysql navicat
+
+https://blog.csdn.net/m0_52559040/article/details/121843945
+
+docker
+
+```sh
+docker search mysql
+docker pull mysql:latest
+docker run -e MYSQL_ROOT_PASSWORD=123456 -p 3306:3306 -d mysql:8
+
+```
+
+navicat 16
+
+https://www.cnblogs.com/ZJ-CN/p/17600684.html
+
+### 2.ORM 框架（typeOrm）
+
+常用的 ORM 框架有：`typeorm` `primsa`
+
+#### 2.1 typeorm
+
+安装依赖
+
+```sh
+pnpm install --save @nestjs/typeorm typeorm mysql2
+```
+
+创建一张 数据库 test
+
+```
+-- Active: 1724985214942@@127.0.0.1@3306
+   CREATE DATABASE
+   DEFAULT CHARACTER SET = 'utf8mb4';
+```
+
+在 app.module.ts 注册
+
+```
+import { Module } from '@nestjs/common'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { UserController } from './modules/user/user.controller'
+import { UserModule } from './modules/user/user.module'
+import { User2Module } from './modules/user2/user2.module'
+import { DocModule } from './modules/doc/doc.module'
+import { UploadModule } from './modules/upload/upload.module'
+import { ListModule } from './modules/list/list.module';
+import { RolesModule } from './modules/roles/roles.module';
+
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: "mysql", //数据库类型
+      username: "root", //账号
+      password: "123456", //密码
+      host: "localhost", //host
+      port: 3306, //
+      database: "test", //库名
+      entities: [__dirname + '/**/*.entity{.ts,.js}'], //实体文件
+      synchronize: true, //synchronize字段代表是否自动将实体类同步到数据库
+      retryDelay: 500, //重试连接数据库间隔
+      retryAttempts: 10,//重试连接数据库的次数
+      autoLoadEntities: true, //如果为true,将自动加载实体 forFeature()方法注册的每个实体都将自动添加到配置对象的实体数组中
+    }),
+
+    UserModule,
+    User2Module,
+    DocModule,
+    UploadModule,
+    ListModule,
+    RolesModule
+
+
+
+  ],
+  controllers: [AppController, UserController],
+  providers: [AppService],
+})
+export class AppModule { }
+
+```
+
+以 auth 为例 ，定义 auth.entity.ts 实体 ,并在 auth.module.ts 中注册
+
+auth.entity.ts:
+
+```
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm'
+
+@Entity()
+export class Auth {
+    @PrimaryGeneratedColumn('uuid')
+    id: string
+
+    @Column()
+    token: string
+
+    @CreateDateColumn()
+    createdTime: Date
+}
+```
+
+auth.module.ts:
+
+```
+import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Auth } from './entities/auth.entity';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Auth])],
+  controllers: [AuthController],
+  providers: [AuthService],
+})
+export class AuthModule { }
+```
+
+这样就创建了数据库`test`,也可以看到`auth`表
+
+## 20.nestjs 实体
+
+### 1.定义
+
+实体是一个映射到数据库表的类。 你可以通过定义一个新类来创建一个实体，并用`@Entity()`来标记：
+
+```
+import {Entity,Column,PrimaryGeneratedColumn} from 'typeorm'
+
+@Entity()
+export class Test {
+    @PrimaryGeneratedColumn()
+    id:number
+
+    @Column()
+    name:string
+
+    @Column()
+    password:string
+
+    @Column()
+    age:number
+}
+```
+
+### 2.列类型
+
+```ts
+    @Column({type:"varchar",length:200})
+    password: string
+
+    @Column({ type: "int"})
+    age: number
+
+    @CreateDateColumn({type:"timestamp"})
+    create_time:Date
+```
+
+mysql 所有类型
+
+`int`, `bigint`, `bit`, `decimal`, `money`, `numeric`, `smallint`, `smallmoney`, `tinyint`, `float`, `real`, `date`, `datetime2`, `datetime`, `datetimeoffset`, `smalldatetime`, `time`, `char`, `varchar`, `text`, `nchar`, `nvarchar`, `ntext`, `binary`, `image`, `varbinary`, `hierarchyid`, `sql_variant`, `timestamp`, `uniqueidentifier`, `xml`, `geometry`, `geography`, `rowversion`
+
+#### 列选项
+
+```
+    @Column({
+        type:"varchar",
+        name:"ipaaa", //数据库表中的列名
+        nullable:true, //在数据库中使列NULL或NOT NULL。 默认情况下，列是nullable：false
+        comment:"注释",
+        select:true,  //定义在进行查询时是否默认隐藏此列。 设置为false时，列数据不会显示标准查询。 默认情况下，列是select：true
+        default:"xxxx", //加数据库级列的DEFAULT值
+        primary:false, //将列标记为主要列。 使用方式和@ PrimaryColumn相同。
+        update:true, //指示"save"操作是否更新列值。如果为false，则只能在第一次插入对象时编写该值。 默认值为"true"
+        collation:"", //定义列排序规则。
+    })
+    ip:string
+```
+
+#### 自动生成列
+
+```
+@Generated('uuid')
+uuid:string
+```
+
+#### 枚举列
+
+```
+  @Column({
+    type:"enum",
+    enum:['1','2','3','4'],
+    default:'1'
+  })
+  xx:string
+```
+
+#### 主列
+
+自动递增的主键
+
+```
+@PrimaryGeneratedColumn()
+id:string
+```
+
+自动递增 uuid
+
+```
+@PrimaryGeneratedColumn("uuid")
+id:string
+```
+
+#### simple-array 列类型
+
+有一种称为 simple-array 的特殊列类型，它可以将原始数组值存储在单个字符串列中。 所有值都以逗号分隔
+
+```
+@Entity()
+export class User {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column("simple-array")
+    names: string[];
+}
+```
+
+simple-json 列类型
+还有一个名为 simple-json 的特殊列类型，它可以存储任何可以通过 JSON.stringify 存储在数据库中的值。 当你的数据库中没有 json 类型而你又想存储和加载对象，该类型就很有用了。 例如:
+
+```
+@Entity()
+export class User {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column("simple-json")
+    profile: { name: string; nickname: string };
+}
+```
