@@ -3130,3 +3130,8 @@ export class User {
     profile: { name: string; nickname: string };
 }
 ```
+
+
+
+## 21.nestjs 第一个CURD
+
