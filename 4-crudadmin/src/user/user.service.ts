@@ -27,29 +27,30 @@ export class UserService {
   }
 
   async findAll(query: { keyWord: string; page: number; pageSize: number }) {
-    // const data = await this.userRepository.find({
-    //   where: {
-    //     name: Like(`%${query.keyWord}%`),
-    //   },
-    //   skip: (query.page - 1) * query.pageSize,
-    //   take: query.pageSize,
-    // });
-    // const total = await this.userRepository.count({
-    //   where: {
-    //     name: Like(`%${query.keyWord}%`),
-    //   },
-    // });
+    const data = await this.userRepository.find({
+      where: {
+        name: Like(`%${query.keyWord}%`),
+      },
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+      order: { id: 'DESC' },
+    })
+    const total = await this.userRepository.count({
+      where: {
+        name: Like(`%${query.keyWord}%`),
+      },
+    })
 
-    const where = { name: Like(`%${query.keyWord}%`) }
-    const [data, total] = await Promise.all([
-      this.userRepository.find({
-        where,
-        order: { id: 'DESC' },
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
-      }),
-      this.userRepository.count({ where }),
-    ])
+    // const where = { name: Like(`%${query.keyWord}%`) }
+    // const [data, total] = await Promise.all([
+    //   this.userRepository.find({
+    //     where,
+    //     order: { id: 'DESC' },
+    //     skip: (query.page - 1) * query.pageSize,
+    //     take: query.pageSize,
+    //   }),
+    //   this.userRepository.count({ where }),
+    // ])
 
     return {
       data,
@@ -57,15 +58,17 @@ export class UserService {
     }
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} user`
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`
+  update(id: string, updateUserDto: UpdateUserDto) {
+    console.log('id', id, updateUserDto)
+
+    return this.userRepository.update(id, updateUserDto)
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`
+  remove(id: string) {
+    return this.userRepository.delete(id)
   }
 }
