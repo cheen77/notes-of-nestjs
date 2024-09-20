@@ -15,3 +15,12 @@ export const delUser = (data) =>
 
 export const updateUser = (data) =>
   axios.patch(`/user/${data.id}`, data).then((res) => res.data);
+
+export const oneToOneApi = (data) =>
+  axios.post("/user/oneToOneApi", data).then((res) => res.data);
+
+export const oneToManyApi = (data) =>
+  axios.post("/user/oneToManyApi", data).then((res) => res.data);
+
+export const manyToManyApi = (data) =>
+  axios.post("/user/manyToManyApi", data).then((res) => res.data);

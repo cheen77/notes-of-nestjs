@@ -3013,7 +3013,7 @@ export class AuthModule { }
 
 ### 1.定义
 
-实体是一个映射到数据库表的类。 你可以通过定义一个新类来创建一个实体，并用`@Entity()`来标记：
+实体是一个映射到数据库·表的类。 你可以通过定义一个新类来创建一个实体，并用`@Entity()`来标记：
 
 ```
 import {Entity,Column,PrimaryGeneratedColumn} from 'typeorm'
@@ -3131,7 +3131,522 @@ export class User {
 }
 ```
 
+## 21.nestjs 第一个 CURD
+
+![alt text](./imgs/image32.png)
+
+## 22.nestjs 多表联查
+
+有时候，我们不会把所有数据放在一张表里，我们会进行分表，把数据分开存，然后通过关联关系，联合查询。
+
+### 1.[关系](https://typeorm.bootcss.com/relations#%E4%BB%80%E4%B9%88%E6%98%AF%E5%85%B3%E7%B3%BB)
+
+关系可以帮助你轻松地与相关实体合作。 有几种类型的关系：
+
+- [一对一](https://typeorm.bootcss.com/one-to-one-relations) 使用 `@OneToOne`
+- [多对一](https://typeorm.bootcss.com/many-to-one-one-to-many-relations) 使用 `@ManyToOne`
+- [一对多](https://typeorm.bootcss.com/many-to-one-one-to-many-relations) 使用 `@OneToMany`
+- [多对多](https://typeorm.bootcss.com/many-to-many-relations) 使用 `@ManyToMany`
+
+### 2.[关系选项](https://typeorm.bootcss.com/relations#%E5%85%B3%E7%B3%BB%E9%80%89%E9%A1%B9)
+
+你可以为关系指定几个选项：
+
+- `eager: boolean` - 如果设置为 true，则在此实体上使用`find *` 或`QueryBuilder`时，将始终使用主实体加载关系
+- `cascade: boolean` - 如果设置为 true，则将插入相关对象并在数据库中更新。
+- `onDelete: "RESTRICT"|"CASCADE"|"SET NULL"` - 指定删除引用对象时外键的行为方式
+- `primary: boolean` - 指示此关系的列是否为主列。
+- `nullable: boolean` -指示此关系的列是否可为空。 默认情况下是可空。
+- `orphanedRowAction: "nullify" | "delete"` - 将子行从其父行中删除后，确定该子行是孤立的（默认值）还是删除的。
+
+### 3.[`@JoinColumn`选项](https://typeorm.bootcss.com/relations#joincolumn%E9%80%89%E9%A1%B9)
+
+`@ JoinColumn`不仅定义了关系的哪一侧包含带有外键的连接列，还允许自定义连接列名和引用的列名。
+
+当我们设置`@ JoinColumn`时，它会自动在数据库中创建一个名为`propertyName + referencedColumnName`的列。 例如：
+
+```
+@ManyToOne(type => Category)
+@JoinColumn() // 这个装饰器对于@ManyToOne是可选的，但@OneToOne是必需的
+category: Category;
+```
+
+此代码将在数据库中创建`categoryId`列。 如果要在数据库中更改此名称，可以指定自定义连接列名称：
+
+```
+@ManyToOne(type => Category)
+@JoinColumn({ name: "cat_id" })
+category: Category;
+```
+
+Join 列始终是对其他一些列的引用（使用外键）。 默认情况下，关系始终引用相关实体的主列。 如果要与相关实体的其他列创建关系 - 你也可以在`@ JoinColumn`中指定它们：
+
+```
+@ManyToOne(type => Category)
+@JoinColumn({ referencedColumnName: "name" })
+category: Category;
+```
+
+该关系现在引用`Category`实体的`name`，而不是`id`。 该关系的列名将变为`categoryName`
+
+### 4.[`@JoinTable`选项](https://typeorm.bootcss.com/relations#jointable%E9%80%89%E9%A1%B9)
+
+`@ JoinTable`用于“多对多”关系，并描述"junction"表的连接列。 联结表是由 TypeORM 自动创建的一个特殊的单独表，其中的列引用相关实体。 你可以使用`@ JoinColumn`更改联结表及其引用列中的列名： 你还可以更改生成的"junction"表的名称。
+
+```
+@ManyToMany(type => Category)
+@JoinTable({
+    name: "question_categories" // 此关系的联结表的表名
+    joinColumn: {
+        name: "question",
+        referencedColumnName: "id"
+    },
+    inverseJoinColumn: {
+        name: "category",
+        referencedColumnName: "id"
+    }
+})
+categories: Category[];
+```
+
+如果目标表具有复合主键， 则必须将一组属性发送到`@ JoinTable`。
+
+### 5.一对一
+
+在`	typeorm`中，`一对一关系`是一种数据库关系，其中一个表中的每一行只与另外一个表中的一行相关联，比如用户和身份证之间的关系
+
+我们在 4-crudadmin 中，以`User表`和`Profile表`实体为例
+
+#### 单向
+
+```js
+// user.entity
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  JoinColumn,
+} from "typeorm";
+import { Profile } from "./profile.entity";
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+  @Column({ type: "varchar" })
+  name: string;
+  @Column({ type: "varchar" })
+  desc: string;
+  @CreateDateColumn({ type: "timestamp" })
+  createdTime: Date;
+
+  // 一对一
+  @JoinColumn() //必选项并且只能在关系的一侧设置。 你设置@JoinColumn的哪一方，哪一方的表将包含一个"relation id"和目标实体表的外键。
+  @OneToOne(() => Profile, {
+    cascade: true, // 级联操作,启用级联后，只需一次save调用即可保存此关系。
+    onDelete: "CASCADE", // 删除user时，自动删除profile
+    onUpdate: "CASCADE", // 更新user时，自动更新profile
+  })
+  profile: Profile;
+}
+```
+
+```
+//profile.entity
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm'
+
+@Entity()
+export class Profile {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @Column({
+    type: 'bigint',
+    comment: '身份证号',
+  })
+  code: number
+
+  @Column({
+    type: 'varchar',
+    comment: '姓名',
+  })
+  name: string
+}
+
+```
+
+```
+//user.controller
+  @Post('/oneToOneApi')
+  oneToOneApi(@Body() oneToOneDto: OneToOneDto) {
+    return this.userService.oneToOneApi(oneToOneDto)
+  }
+```
+
+```
+// user.service
+  async oneToOneApi(oneToOneApi: OneToOneDto) {
+    const profile = new Profile()
+    profile.name = oneToOneApi.name
+    profile.code = oneToOneApi.code
+    const userInfo = await this.userRepository.findOne({
+      where: {
+        id: oneToOneApi.id,
+      },
+    })
+    userInfo.profile = profile
+    console.log(userInfo.profile.code)
+
+    // await this.profileRepository.save(profile)
+    await this.userRepository.save(userInfo)
+    return true
+  }
+```
+
+关系可以是单向的和双向的。
+
+#### 双向
+
+```
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne } from 'typeorm'
+import { User } from './user.entity'
+
+@Entity()
+export class Profile {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @Column({
+    type: 'bigint',
+    comment: '身份证号',
+  })
+  code: number
+
+  @Column({
+    type: 'varchar',
+    comment: '姓名',
+  })
+  name: string
+
+  @OneToOne(() => User, (user) => user.profile) // 将另一面指定为第二个参数
+  user: User
+}
+
+```
+
+#### 查询一对一关系
+
+```
+user.controller
+  @Get('/getOneToOne')
+  getOneToOne(@Query() query) {
+    return this.userService.getOneToOne()
+  }
+```
+
+```
+user.service
+  async getOneToOne() {
+    return this.userRepository.find({
+      //查询的时候如果需要联合查询需要增加 relations
+      relations: ['profile'],
+    })
+  }
+```
+
+```
+//访问http://localhost:3000/api/user/getOneToOne
+
+[
+    {
+        id: "95bdc98c-a220-4348-834e-56692d446ebd",
+        name: "成哥",
+        desc: "很帅",
+        createdTime: "2024-09-19T07:13:11.424Z",
+        profile: {
+        id: "9852ccad-8ce0-41ce-b9d9-1f668f7ae074",
+        code: "3434",
+        name: "成哥" }
+   }
+]
+```
+
+如果你希望反查也可以，借助双向关系
+
+```
+  async getOneToOne() {
+    return this.profileRepository.find({
+      //查询的时候如果需要联合查询需要增加 relations
+      relations: ['user'],
+    })
+  }
 
 
-## 21.nestjs 第一个CURD
+```
 
+```
+//访问http://localhost:3000/api/user/getOneToOne
+
+[
+    {
+        id: "9852ccad-8ce0-41ce-b9d9-1f668f7ae074",
+        code: "3434",
+        name: "成哥",
+        user: {
+        id: "95bdc98c-a220-4348-834e-56692d446ebd",
+        name: "成哥",
+        desc: "很帅",
+        createdTime: "2024-09-19T07:13:11.424Z"}
+    },
+    {
+        id: "ef23e330-f380-494f-a7ae-6cf7c65d2e0e",
+        code: "510123",
+        name: "成哥",
+        user: null
+    }
+]
+```
+
+### 6.一对多/ 多对一
+
+在`typeorm`中,`一对多关系`是一种常见的关联关系，用于表示两个实体之间的数量关系，即一个实体可以与多个实体相关联，而每个相关联的实体只能与一个实体相关联。比如一个用户可以有多张银行卡，一张银行卡只能属于一个用户。
+
+```
+//bank.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, ManyToOne } from 'typeorm'
+import { User } from './user.entity'
+
+@Entity()
+export class BankCard {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @Column()
+  name: string
+
+  @Column()
+  cardNumber: number
+
+  @ManyToOne(() => User, (user) => user.bankCards)
+  user: User
+}
+
+```
+
+```
+// user.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, JoinColumn, OneToMany } from 'typeorm'
+import { Profile } from './profile.entity'
+import { BankCard } from './bankCard.entity'
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+  @Column({ type: 'varchar' })
+  name: string
+  @Column({ type: 'varchar' })
+  desc: string
+  @CreateDateColumn({ type: 'timestamp' })
+  createdTime: Date
+
+  // 一对一
+  @JoinColumn() //必选项并且只能在关系的一侧设置。 你设置@JoinColumn的哪一方，哪一方的表将包含一个"relation id"和目标实体表的外键。
+  @OneToOne(() => Profile, {
+    cascade: true, // 级联操作,启用级联后，只需一次save调用即可保存此关系。
+    onDelete: 'CASCADE', // 删除user时，自动删除profile
+    onUpdate: 'CASCADE', // 更新user时，自动更新profile
+  })
+  profile: Profile
+
+  // 一对多  第一个参数是个函数返回关联的BankCard类 所以在bankCard表关联user ,  第二个参数 创建双向关系
+  @OneToMany(() => BankCard, (bankCard) => bankCard.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  bankCards: BankCard[]
+}
+
+```
+
+```
+//user.controller
+  @Post('/oneToManyApi')
+  oneToManyApi(@Body() oneToManyDto: OneToManyDto) {
+    return this.userService.oneToManyApi(oneToManyDto)
+  }
+
+  @Get('/getOneToMany')
+  getOneToMany(@Query() query) {
+    return this.userService.getOneToMany()
+  }
+
+```
+
+```
+//user.service
+  async oneToManyApi(oneToManyApi: OneToManyDto) {
+    const bankCard = new BankCard()
+    bankCard.name = oneToManyApi.name
+    bankCard.cardNumber = oneToManyApi.cardNumber
+
+    const userInfo = await this.userRepository.findOne({
+      where: {
+        id: oneToManyApi.id,
+      },
+    })
+
+    userInfo.bankCards = [bankCard]
+    await this.userRepository.save(userInfo) //注意我们级联关系绑在那边，就是用那边进行数据库操作
+    return true //一定是多对一 多的那一边带着一的id
+  }
+
+  async getOneToMany() {
+    return this.userRepository.find({
+      //查询的时候如果需要联合查询需要增加 relations
+      relations: ['bankCards'],
+    })
+  }
+```
+
+访问 http://localhost:3000/api/user/getOneToMany
+
+```
+[
+    {
+        id: "95bdc98c-a220-4348-834e-56692d446ebd",
+        name: "成哥",
+        desc: "很帅",
+        createdTime: "2024-09-19T07:13:11.424Z",
+        bankCards: [
+        {
+        id: "bc81f085-75b3-43aa-9cf6-8c201496b0d0",
+        name: "招商",
+        cardNumber: 123
+        }
+        ]
+    }
+]
+```
+
+### 7.多对多
+
+在`typeorm` 中，多对多关系用于表示两个实体之间的双向关系，即一个实体可以和多个实体相关联，同时每个相关联的实体也可以与多个实体相关联。比如一个用户可以有多个游戏，一个游戏也可以对应多个用户
+
+多对多关系可以是`单向`或者`双向`
+
+```
+//game.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, ManyToMany } from 'typeorm'
+import { User } from './user.entity'
+
+@Entity()
+export class Game {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @Column()
+  name: string
+
+  @ManyToMany(() => User, (user) => user.games)
+  users: User[]
+}
+
+```
+
+```
+//user.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, JoinColumn, OneToMany, JoinTable, ManyToMany } from 'typeorm'
+import { Profile } from './profile.entity'
+import { BankCard } from './bankCard.entity'
+import { Game } from './game.entity'
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+  @Column({ type: 'varchar' })
+  name: string
+  @Column({ type: 'varchar' })
+  desc: string
+  @CreateDateColumn({ type: 'timestamp' })
+  createdTime: Date
+
+  // 一对一
+  @JoinColumn() //必选项并且只能在关系的一侧设置。 你设置@JoinColumn的哪一方，哪一方的表将包含一个"relation id"和目标实体表的外键。
+  @OneToOne(() => Profile, {
+    cascade: true, // 级联操作,启用级联后，只需一次save调用即可保存此关系。
+    onDelete: 'CASCADE', // 删除user时，自动删除profile
+    onUpdate: 'CASCADE', // 更新user时，自动更新profile
+  })
+  profile: Profile
+
+  // 一对多  第一个参数是个函数返回关联的BankCard类 所以在bankCard表关联user ,  第二个参数 创建双向关系
+  @OneToMany(() => BankCard, (bankCard) => bankCard.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  bankCards: BankCard[]
+
+  // 多对多
+  @JoinTable() // 多对多关系 必须把@JoinTable放在关系的一个（拥有）方面。
+  @ManyToMany(() => Game, (game) => game.users, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  games: Game[]
+}
+
+```
+
+```
+//user.controller
+  @Post('/manyToManyApi')
+  manyToManyApi(@Body() params: { tags: string[]; userId: string }) {
+    return this.userService.manyToManyApi(params)
+  }
+
+  @Get('/getManyToMany')
+  getManyToMany(@Query() query) {
+    return this.userService.getManyToMany()
+  }
+
+```
+
+```
+//user.service
+  async manyToManyApi(params: { tags: string[]; userId: string }) {
+    console.log(params)
+    const gamelist: Game[] = []
+    for (let index = 0; index < params.tags.length; index++) {
+      const game = new Game()
+      game.name = params.tags[index]
+      gamelist.push(game)
+    }
+    const userInfo = await this.userRepository.findOne({
+      where: {
+        id: params.userId,
+      },
+    })
+    userInfo.games = gamelist
+    await this.userRepository.save(userInfo)
+    return true
+  }
+
+  async getManyToMany() {
+    // return this.userRepository.find({
+    //   relations: ['games'],
+    // })
+
+    return this.gameRepository.find({
+      relations: ['users'],
+    })
+  }
+```
+
+## 22. 事务
