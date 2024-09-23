@@ -3764,6 +3764,46 @@ export class DeptService {
 
 ```
 
+或者
+比如
+
+```typescript
+import { DataSource } from "typeorm";
+
+@Injectable()
+export class RestaurantService {
+  constructor(
+    private readonly dataSource: DataSource,
+    @InjectRepository(RestaurantEntity)
+    private restaurantRepo: Repository<RestaurantEntity>
+  ) {}
+  async createRestaurant(payload: CreateRestaurantBodyDto) {
+    let createdRestaurant = null;
+    console.log(payload);
+    // 获取连接并创建新的queryRunner
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction(); //开始事务
+
+      createdRestaurant = await this.createUserRestaurant(
+        { ...payload, restaurant_address: payload.address },
+        queryRunner
+      );
+      await this.createAddress(payload.address, createdRestaurant, queryRunner);
+      await queryRunner.commitTransaction(); // 提交事务：
+      return createdRestaurant;
+    } catch (err) {
+      // 有错误做出回滚更改
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+}
+```
+
 ## 24. typeorm 迁移 migrations
 
 ### 1.使用情景
@@ -4086,6 +4126,5 @@ export const dataSourceOptions: DataSourceOptions = {
 ![alt text](./imgs/image38.png)
 
 ![alt text](./imgs/image39.png)
-
 
 如果我们想回滚，运行`pnpm run migration:revert`，就行了
