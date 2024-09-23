@@ -39,4 +39,7 @@ export class User {
     onUpdate: 'CASCADE',
   })
   games: Game[]
+
+  @Column({ type: 'int' })
+  age: number
 }

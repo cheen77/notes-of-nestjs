@@ -3135,7 +3135,7 @@ export class User {
 
 ![alt text](./imgs/image32.png)
 
-## 22.nestjs 多表联查
+## 22.typeorm 多表联查
 
 有时候，我们不会把所有数据放在一张表里，我们会进行分表，把数据分开存，然后通过关联关系，联合查询。
 
@@ -3219,7 +3219,7 @@ categories: Category[];
 
 #### 单向
 
-```js
+```typescript
 // user.entity
 import {
   Entity,
@@ -3253,31 +3253,35 @@ export class User {
 }
 ```
 
-```
+```typescript
 //profile.entity
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from "typeorm";
 
 @Entity()
 export class Profile {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
   @Column({
-    type: 'bigint',
-    comment: '身份证号',
+    type: "bigint",
+    comment: "身份证号",
   })
-  code: number
+  code: number;
 
   @Column({
-    type: 'varchar',
-    comment: '姓名',
+    type: "varchar",
+    comment: "姓名",
   })
-  name: string
+  name: string;
 }
-
 ```
 
-```
+```typescript
 //user.controller
   @Post('/oneToOneApi')
   oneToOneApi(@Body() oneToOneDto: OneToOneDto) {
@@ -3285,7 +3289,7 @@ export class Profile {
   }
 ```
 
-```
+```typescript
 // user.service
   async oneToOneApi(oneToOneApi: OneToOneDto) {
     const profile = new Profile()
@@ -3309,36 +3313,41 @@ export class Profile {
 
 #### 双向
 
-```
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne } from 'typeorm'
-import { User } from './user.entity'
+```typescript
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+} from "typeorm";
+import { User } from "./user.entity";
 
 @Entity()
 export class Profile {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
   @Column({
-    type: 'bigint',
-    comment: '身份证号',
+    type: "bigint",
+    comment: "身份证号",
   })
-  code: number
+  code: number;
 
   @Column({
-    type: 'varchar',
-    comment: '姓名',
+    type: "varchar",
+    comment: "姓名",
   })
-  name: string
+  name: string;
 
   @OneToOne(() => User, (user) => user.profile) // 将另一面指定为第二个参数
-  user: User
+  user: User;
 }
-
 ```
 
 #### 查询一对一关系
 
-```
+```typescript
 user.controller
   @Get('/getOneToOne')
   getOneToOne(@Query() query) {
@@ -3346,7 +3355,7 @@ user.controller
   }
 ```
 
-```
+```typescript
 user.service
   async getOneToOne() {
     return this.userRepository.find({
@@ -3356,26 +3365,27 @@ user.service
   }
 ```
 
-```
+```typescript
 //访问http://localhost:3000/api/user/getOneToOne
 
 [
-    {
-        id: "95bdc98c-a220-4348-834e-56692d446ebd",
-        name: "成哥",
-        desc: "很帅",
-        createdTime: "2024-09-19T07:13:11.424Z",
-        profile: {
-        id: "9852ccad-8ce0-41ce-b9d9-1f668f7ae074",
-        code: "3434",
-        name: "成哥" }
-   }
-]
+  {
+    id: "95bdc98c-a220-4348-834e-56692d446ebd",
+    name: "成哥",
+    desc: "很帅",
+    createdTime: "2024-09-19T07:13:11.424Z",
+    profile: {
+      id: "9852ccad-8ce0-41ce-b9d9-1f668f7ae074",
+      code: "3434",
+      name: "成哥",
+    },
+  },
+];
 ```
 
 如果你希望反查也可以，借助双向关系
 
-```
+```typescript
   async getOneToOne() {
     return this.profileRepository.find({
       //查询的时候如果需要联合查询需要增加 relations
@@ -3386,93 +3396,107 @@ user.service
 
 ```
 
-```
+```typescript
 //访问http://localhost:3000/api/user/getOneToOne
 
 [
-    {
-        id: "9852ccad-8ce0-41ce-b9d9-1f668f7ae074",
-        code: "3434",
-        name: "成哥",
-        user: {
-        id: "95bdc98c-a220-4348-834e-56692d446ebd",
-        name: "成哥",
-        desc: "很帅",
-        createdTime: "2024-09-19T07:13:11.424Z"}
+  {
+    id: "9852ccad-8ce0-41ce-b9d9-1f668f7ae074",
+    code: "3434",
+    name: "成哥",
+    user: {
+      id: "95bdc98c-a220-4348-834e-56692d446ebd",
+      name: "成哥",
+      desc: "很帅",
+      createdTime: "2024-09-19T07:13:11.424Z",
     },
-    {
-        id: "ef23e330-f380-494f-a7ae-6cf7c65d2e0e",
-        code: "510123",
-        name: "成哥",
-        user: null
-    }
-]
+  },
+  {
+    id: "ef23e330-f380-494f-a7ae-6cf7c65d2e0e",
+    code: "510123",
+    name: "成哥",
+    user: null,
+  },
+];
 ```
 
 ### 6.一对多/ 多对一
 
 在`typeorm`中,`一对多关系`是一种常见的关联关系，用于表示两个实体之间的数量关系，即一个实体可以与多个实体相关联，而每个相关联的实体只能与一个实体相关联。比如一个用户可以有多张银行卡，一张银行卡只能属于一个用户。
 
-```
+```typescript
 //bank.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, ManyToOne } from 'typeorm'
-import { User } from './user.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  ManyToOne,
+} from "typeorm";
+import { User } from "./user.entity";
 
 @Entity()
 export class BankCard {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
   @Column()
-  name: string
+  name: string;
 
   @Column()
-  cardNumber: number
+  cardNumber: number;
 
   @ManyToOne(() => User, (user) => user.bankCards)
-  user: User
+  user: User;
 }
-
 ```
 
-```
+```typescript
 // user.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, JoinColumn, OneToMany } from 'typeorm'
-import { Profile } from './profile.entity'
-import { BankCard } from './bankCard.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  JoinColumn,
+  OneToMany,
+} from "typeorm";
+import { Profile } from "./profile.entity";
+import { BankCard } from "./bankCard.entity";
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
-  @Column({ type: 'varchar' })
-  name: string
-  @Column({ type: 'varchar' })
-  desc: string
-  @CreateDateColumn({ type: 'timestamp' })
-  createdTime: Date
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+  @Column({ type: "varchar" })
+  name: string;
+  @Column({ type: "varchar" })
+  desc: string;
+  @CreateDateColumn({ type: "timestamp" })
+  createdTime: Date;
 
   // 一对一
   @JoinColumn() //必选项并且只能在关系的一侧设置。 你设置@JoinColumn的哪一方，哪一方的表将包含一个"relation id"和目标实体表的外键。
   @OneToOne(() => Profile, {
     cascade: true, // 级联操作,启用级联后，只需一次save调用即可保存此关系。
-    onDelete: 'CASCADE', // 删除user时，自动删除profile
-    onUpdate: 'CASCADE', // 更新user时，自动更新profile
+    onDelete: "CASCADE", // 删除user时，自动删除profile
+    onUpdate: "CASCADE", // 更新user时，自动更新profile
   })
-  profile: Profile
+  profile: Profile;
 
   // 一对多  第一个参数是个函数返回关联的BankCard类 所以在bankCard表关联user ,  第二个参数 创建双向关系
   @OneToMany(() => BankCard, (bankCard) => bankCard.user, {
     cascade: true,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
   })
-  bankCards: BankCard[]
+  bankCards: BankCard[];
 }
-
 ```
 
-```
+```typescript
 //user.controller
   @Post('/oneToManyApi')
   oneToManyApi(@Body() oneToManyDto: OneToManyDto) {
@@ -3486,7 +3510,7 @@ export class User {
 
 ```
 
-```
+```typescript
 //user.service
   async oneToManyApi(oneToManyApi: OneToManyDto) {
     const bankCard = new BankCard()
@@ -3514,22 +3538,22 @@ export class User {
 
 访问 http://localhost:3000/api/user/getOneToMany
 
-```
+```typescript
 [
-    {
-        id: "95bdc98c-a220-4348-834e-56692d446ebd",
-        name: "成哥",
-        desc: "很帅",
-        createdTime: "2024-09-19T07:13:11.424Z",
-        bankCards: [
-        {
+  {
+    id: "95bdc98c-a220-4348-834e-56692d446ebd",
+    name: "成哥",
+    desc: "很帅",
+    createdTime: "2024-09-19T07:13:11.424Z",
+    bankCards: [
+      {
         id: "bc81f085-75b3-43aa-9cf6-8c201496b0d0",
         name: "招商",
-        cardNumber: 123
-        }
-        ]
-    }
-]
+        cardNumber: 123,
+      },
+    ],
+  },
+];
 ```
 
 ### 7.多对多
@@ -3538,73 +3562,88 @@ export class User {
 
 多对多关系可以是`单向`或者`双向`
 
-```
+```typescript
 //game.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, ManyToMany } from 'typeorm'
-import { User } from './user.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  ManyToMany,
+} from "typeorm";
+import { User } from "./user.entity";
 
 @Entity()
 export class Game {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
   @Column()
-  name: string
+  name: string;
 
   @ManyToMany(() => User, (user) => user.games)
-  users: User[]
+  users: User[];
 }
-
 ```
 
-```
+```typescript
 //user.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, JoinColumn, OneToMany, JoinTable, ManyToMany } from 'typeorm'
-import { Profile } from './profile.entity'
-import { BankCard } from './bankCard.entity'
-import { Game } from './game.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  JoinColumn,
+  OneToMany,
+  JoinTable,
+  ManyToMany,
+} from "typeorm";
+import { Profile } from "./profile.entity";
+import { BankCard } from "./bankCard.entity";
+import { Game } from "./game.entity";
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string
-  @Column({ type: 'varchar' })
-  name: string
-  @Column({ type: 'varchar' })
-  desc: string
-  @CreateDateColumn({ type: 'timestamp' })
-  createdTime: Date
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+  @Column({ type: "varchar" })
+  name: string;
+  @Column({ type: "varchar" })
+  desc: string;
+  @CreateDateColumn({ type: "timestamp" })
+  createdTime: Date;
 
   // 一对一
   @JoinColumn() //必选项并且只能在关系的一侧设置。 你设置@JoinColumn的哪一方，哪一方的表将包含一个"relation id"和目标实体表的外键。
   @OneToOne(() => Profile, {
     cascade: true, // 级联操作,启用级联后，只需一次save调用即可保存此关系。
-    onDelete: 'CASCADE', // 删除user时，自动删除profile
-    onUpdate: 'CASCADE', // 更新user时，自动更新profile
+    onDelete: "CASCADE", // 删除user时，自动删除profile
+    onUpdate: "CASCADE", // 更新user时，自动更新profile
   })
-  profile: Profile
+  profile: Profile;
 
   // 一对多  第一个参数是个函数返回关联的BankCard类 所以在bankCard表关联user ,  第二个参数 创建双向关系
   @OneToMany(() => BankCard, (bankCard) => bankCard.user, {
     cascade: true,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
   })
-  bankCards: BankCard[]
+  bankCards: BankCard[];
 
   // 多对多
   @JoinTable() // 多对多关系 必须把@JoinTable放在关系的一个（拥有）方面。
   @ManyToMany(() => Game, (game) => game.users, {
     cascade: true,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
   })
-  games: Game[]
+  games: Game[];
 }
-
 ```
 
-```
+```typescript
 //user.controller
   @Post('/manyToManyApi')
   manyToManyApi(@Body() params: { tags: string[]; userId: string }) {
@@ -3618,7 +3657,7 @@ export class User {
 
 ```
 
-```
+```typescript
 //user.service
   async manyToManyApi(params: { tags: string[]; userId: string }) {
     console.log(params)
@@ -3649,4 +3688,404 @@ export class User {
   }
 ```
 
-## 22. 事务
+## 23. typeorm 事务
+
+### 什么是事务？
+
+事务是一种确保一系列数据库操作要么全部成功、要么全部回滚的机制。
+在 `TypeORM `中，事务可以帮助你保证数据的一致性和完整性，尤其是在`多步更新数据库`的操作中。
+
+### 事务的四大特性
+
+事务具有 4 个基本特征，分别是：原子性（Atomicity）、一致性（Consistency）、隔离性（Isolation）、持久性（Duration），简称 ACID
+
+- 原子性
+  事务的原子性是指事务必须是一个原子的操作序列单元。事务中包含的各项操作在一次执行过程中，只允许出现两种状态之一，要么都成功，要么都失败
+
+  任何一项操作都会导致整个事务的失败，同时其它已经被执行的操作都将被撤销并回滚，只有所有的操作全部成功，整个事务才算是成功完成
+
+- 一致性（Consistency）
+  事务的一致性是指事务的执行不能破坏数据库数据的完整性和一致性，一个事务在执行之前和执行之后，数据库都必须处以一致性状态。
+
+- 隔离性
+  事务的隔离性是指在并发环境中，并发的事务是互相隔离的，一个事务的执行不能被其它事务干扰。也就是说，不同的事务并发操作相同的数据时，每个事务都有各自完整的数据空间。
+
+一个事务内部的操作及使用的数据对其它并发事务是隔离的，并发执行的各个事务是不能互相干扰的
+
+- 持久性（Duration）
+  事务的持久性是指事务一旦提交后，数据库中的数据必须被永久的保存下来。即使服务器系统崩溃或服务器宕机等故障。只要数据库重新启动，那么一定能够将其恢复到事务成功结束后的状态
+
+### 使用场景
+
+`多表更新或插入：`
+
+- 当你需要在多个表中插入或更新数据时，如果其中一步操作失败，整个操作可以回滚，防止数据库进入不一致状态。
+
+`复杂业务逻辑：`
+
+- 在执行复杂的业务逻辑时，可能需要跨多个操作保持数据一致。事务可以确保所有操作要么全部成功，要么全部失败。
+
+`防止部分更新：`
+
+- 当一个操作依赖另一个操作成功时，你可以使用事务来保证不会出现部分更新的情况。例如，资金转账时，从一个账户扣除后，必须确保另一个账户收到款项。
+
+`异常处理：`
+
+- 处理代码中的异常时，如果有未完成的数据库操作，事务可以回滚这些操作。
+
+### 事务的实现方式
+
+事务是使用`Connection`或`EntityManager`创建的。 例如这个代码片段：
+
+```typescript
+import { Injectable } from '@nestjs/common'
+import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm'
+import { EntityManager, Repository, TreeRepository } from 'typeorm'
+import { MoveDept } from './dept.dto'
+
+@Injectable()
+export class DeptService {
+  constructor(
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
+    @InjectRepository(DeptEntity)
+    private deptRepository: TreeRepository<DeptEntity>,
+    @InjectEntityManager() private entityManager: EntityManager,
+  ) {}
+
+  /**
+   * 移动排序
+   */
+  async move(depts: MoveDept[]): Promise<void> {
+    await this.entityManager.transaction(async (manager) => {
+      await manager.save(depts)
+    })
+  }
+
+```
+
+## 24. typeorm 迁移 migrations
+
+### 1.使用情景
+
+假设你已经有一个数据库和一个`post`实体：
+
+```typescript
+import { Entity, Column, PrimaryGeneratedColumn } from "typeorm";
+
+@Entity()
+export class Post {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  title: string;
+
+  @Column()
+  text: string;
+}
+```
+
+这些实体在生产环境中运行了几个月而没有任何变化。 数据库中产生了有几千个 `posts`。现在你需要创建一个新版本并将`title`重命名为`name`，又或者我需要新增一个`code`字段，那么我们需要使用`migrations `迁移功能。
+
+### 2.migrations vs synchronize
+
+一旦上线生产环境，你将需要将模型更改同步到数据库中。通常在数据库中获取数据后，使用`synchronize：true`进行`生产模式`同步是不安全的。 因此这时候使用`migrations` ，可以解决此类问题。
+
+#### synchronize
+
+`synchronize：true`只适合于`开发环境`使用, 以此来加快开发效率，便于频繁修改实体并实时反映到数据库中。
+
+然而，在`生产环境`中，强烈建议关闭 `synchronize`，并采用`迁移工具`手动管理数据库结构。
+
+因为在`生产环境`使用可能会造成数据丢失的风险，显然对于`生产环境`下这是一个非常严重的问题。
+
+#### migrations
+
+`typeorm`提供了迁移的功能来解决`生产环境` 数据迁移的问题。
+
+**迁移的好处：**
+
+- 版本控制：可以清晰地记录每次数据库结构的更改。
+
+- 可审计性：每次更新都可以被审计，确保数据库的安全性和完整性。
+- 回滚支持：如果某次迁移出现问题，可以方便地回滚到之前的版本。
+
+### 3.利用 4-crudadmin 来演示迁移
+
+#### 1.前置修改
+
+之前我们已经在`app.module.ts`中进行了数据库连接
+
+```typescript
+import { Module } from "@nestjs/common";
+import { AppController } from "./app.controller";
+import { AppService } from "./app.service";
+import { UserModule } from "./user/user.module";
+import { TypeOrmModule } from "@nestjs/typeorm";
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: "mysql", //数据库类型
+      username: "root", //账号
+      password: "alice", //密码
+      host: "localhost", //host
+      port: 3306, //
+      database: "crud", //库名
+      // entities: [__dirname + '/**/*.entity{.ts,.js}'], //实体文件
+      synchronize: true, //synchronize字段代表是否自动将实体类同步到数据库
+      retryDelay: 500, //重试连接数据库间隔
+      retryAttempts: 10, //重试连接数据库的次数
+      autoLoadEntities: true, //如果为true,将自动加载实体 forFeature()方法注册的每个实体都将自动添加到配置对象的实体数组中
+      migrations: [],
+    }),
+    UserModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+创建一个 db 文件夹和 db 文件夹下创建一个 data-source.ts 文件
+
+```typescript
+import { DataSourceOptions, DataSource } from "typeorm";
+export const dataSourceOptions: DataSourceOptions = {
+  type: "mysql", //数据库类型
+  username: "root", //账号
+  password: "alice", //密码
+  host: "localhost", //host
+  port: 3306, //
+  database: "crud", //库名
+  entities: ["dist/**/*.entity.js"],
+  migrations: [],
+};
+
+const dataSource = new DataSource(dataSourceOptions);
+
+export default dataSource;
+```
+
+然后修改 app.modules.ts
+
+```typescript
+import { Module } from "@nestjs/common";
+import { AppController } from "./app.controller";
+import { AppService } from "./app.service";
+import { UserModule } from "./user/user.module";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { dataSourceOptions } from "../db/data-source";
+@Module({
+  imports: [
+    TypeOrmModule.forRoot(
+      Object.assign(dataSourceOptions, {
+        retryDelay: 500, //重试连接数据库间隔
+        retryAttempts: 10, //重试连接数据库的次数
+        autoLoadEntities: true, //如果为true,将自动加载实体 forFeature()方法注册的每个实体都将自动添加到配置对象的实体数组中
+      })
+    ),
+    UserModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+至此，我们已经完成了第一步，暴露出`dataSource`提供给 `TypeORM CLI` 使用
+
+#### 2.修改 package.json 文件
+
+`scripts`添加`migrations`相关命令
+
+```json
+  "scripts": {
+    "typeorm":"npm run build && npx typeorm -d dist/db/data-source.js",
+    "migration:generate":"npm run typeorm -- migration:generate",
+    "migration:run":"npm run typeorm -- migration:run",
+    "migration:revert":"npm run typeorm -- migration:revert",
+  }
+```
+
+**2.1 解释命令**
+
+1. **"typeorm": "npm run build && npx typeorm -d dist/db/data-source.js"**
+
+- **作用**：
+  - **npm run build**：首先执行构建步骤，通常会通过 TypeScript 编译器将项目中的所有 TypeScript 文件编译成 JavaScript 文件，输出到 `dist` 目录中。
+  - **npx typeorm -d dist/db/data-source.js**：构建完成后，使用 `npx` 来执行 TypeORM 命令，`-d dist/db/data-source.js` 是指定数据库配置文件的位置（使用编译后的 JavaScript 文件）。
+- **用法**：
+  - 该脚本是其他迁移命令的基础，它首先构建项目并且在执行 TypeORM 的命令时使用编译后的数据库配置文件。
+
+**2. "migration:generate": "npm run typeorm -- migration:generate"**
+
+- **作用**：
+
+  - 这个脚本通过 `npm run typeorm` 先执行前面的 `"typeorm"` 脚本，完成项目构建和 TypeORM 的基本配置加载。
+  - 然后 `-- migration:generate` 命令被传递给 TypeORM CLI，生成新的数据库迁移文件。TypeORM 会根据当前实体的变化自动生成一份迁移文件。
+
+- **用法**：
+
+  - 当你修改了数据库模型（实体类）并需要生成相应的迁移文件时，可以运行 `npm run migration:generate`。
+
+  示例：
+
+  ```
+  pnpm run migration:generate -- db/migrations/addUserAgeTable
+  ```
+
+**3. "migration:run": "npm run typeorm -- migration:run"**
+
+- **作用**：
+  - 同样的，`npm run typeorm` 会首先执行构建和基础设置，然后 `-- migration:run` 被传递给 TypeORM CLI，用于运行所有还没有被执行的迁移文件。
+  - 这个命令会将数据库的状态更新为最新版本。
+- **用法**：
+  - 当你需要在数据库中应用所有未执行的迁移时，可以运行 `npm run migration:run`。
+
+**4. "migration:revert": "npm run typeorm -- migration:revert"**
+
+- **作用**：
+  - 和其他命令类似，先执行构建和基础设置，然后 `-- migration:revert` 被传递给 TypeORM CLI。
+  - 这个命令用于**回滚**上一次执行的迁移。
+- **用法**：
+  - 当你需要撤销上一次迁移时，运行 `npm run migration:revert`。TypeORM 会回滚最近一次成功执行的迁移。
+
+**2.2 解释 npx**
+
+`npx` 是 Node.js 提供的一个命令，用于执行本地或远程的 npm 包中的可执行文件。`npx` 是 `npm` 的一部分，从 npm 版本 5.2.0 开始引入。它的主要作用是简化在项目中使用可执行工具的流程，避免全局安装某些包。
+
+`npx` 的作用
+
+1. **本地依赖**：如果你的项目中有某个工具作为依赖安装（即在 `node_modules` 里），`npx` 会优先在 `node_modules/.bin` 中查找可执行文件并运行。
+2. **全局依赖**：如果在本地没有找到可执行文件，它会查找全局安装的包中的可执行文件。
+3. **临时执行远程包**：如果包未安装，`npx` 还可以临时下载并运行某个 npm 包中的可执行文件，而不会永久安装它。
+
+#### 3.使用 4-crudadmin 创建迁移文件
+
+假设我们需要在 user 表中添加一个字段，叫做`age`，那么我们就需要创建一个迁移文件，然后执行迁移文件，完成迁移。
+
+```typescript
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  JoinColumn,
+  OneToMany,
+  JoinTable,
+  ManyToMany,
+} from "typeorm";
+import { Profile } from "./profile.entity";
+import { BankCard } from "./bankCard.entity";
+import { Game } from "./game.entity";
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+  @Column({ type: "varchar" })
+  name: string;
+  @Column({ type: "varchar" })
+  desc: string;
+  @CreateDateColumn({ type: "timestamp" })
+  createdTime: Date;
+
+  // 一对一
+  @JoinColumn() //必选项并且只能在关系的一侧设置。 你设置@JoinColumn的哪一方，哪一方的表将包含一个"relation id"和目标实体表的外键。
+  @OneToOne(() => Profile, {
+    cascade: true, // 级联操作,启用级联后，只需一次save调用即可保存此关系。
+    onDelete: "CASCADE", // 删除user时，自动删除profile
+    onUpdate: "CASCADE", // 更新user时，自动更新profile
+  })
+  profile: Profile;
+
+  // 一对多  第一个参数是个函数返回关联的BankCard类 所以在bankCard表关联user ,  第二个参数 创建双向关系
+  @OneToMany(() => BankCard, (bankCard) => bankCard.user, {
+    cascade: true,
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
+  bankCards: BankCard[];
+
+  // 多对多
+  @JoinTable() // 多对多关系 必须把@JoinTable放在关系的一个（拥有）方面。
+  @ManyToMany(() => Game, (game) => game.users, {
+    cascade: true,
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
+  games: Game[];
+
+  @Column({ type: "int" })
+  age: number;
+}
+```
+
+运行
+
+```
+pnpm run migration:generate db/migrations/addUserAgeTable
+```
+
+![alt text](./imgs/image33.png)
+
+![alt text](./imgs/image34.png)
+
+这样后 typeorm cli 会自动给我们生成一个我们指定在`db/migrations/addUserAgeTable` 路径下名为`{TIMESTAMP} -{name}.ts`的迁移文件
+
+```typescript
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class AddUserAgeTable1727080360039 implements MigrationInterface {
+  name = "AddUserAgeTable1727080360039";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE \`user\` ADD \`age\` int NOT NULL`);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE \`user\` DROP COLUMN \`age\``);
+  }
+}
+```
+
+此时如果我们进入数据库查看，就会发现`user`表还没有`age`字段，需要进行`pnpm run migration:run`
+
+```
+pnpm run migration:run
+```
+
+![alt text](./imgs/image35.png)
+
+运行成功后，数据库中的`user`表没有多一个`age`字段，但多了一个 migrations 表
+
+![alt text](./imgs/image36.png)
+
+那是因为我们没有在`db`下的`data-source.ts`中绑定`migrations`字段
+
+```typescript
+export const dataSourceOptions: DataSourceOptions = {
+  type: "mysql", //数据库类型
+  username: "root", //账号
+  password: "alice", //密码
+  host: "localhost", //host
+  port: 3306, //
+  database: "crud", //库名
+  entities: ["dist/**/*.entity.js"],
+  migrations: ["dist/db/migrations/*.js"],
+};
+```
+
+此时再运行`pnpm run migration:run`,就可以看到`migrations`表中迁移内容和`user`表中新增的`age`字段
+
+![alt text](./imgs/image37.png)
+
+![alt text](./imgs/image38.png)
+
+![alt text](./imgs/image39.png)
+
+
+如果我们想回滚，运行`pnpm run migration:revert`，就行了
