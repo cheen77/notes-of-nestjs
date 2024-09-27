@@ -40,6 +40,6 @@ export class User {
   })
   games: Game[]
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', default: null })
   age: number
 }

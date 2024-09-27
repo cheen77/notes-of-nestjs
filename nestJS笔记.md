@@ -4128,3 +4128,6 @@ export const dataSourceOptions: DataSourceOptions = {
 ![alt text](./imgs/image39.png)
 
 如果我们想回滚，运行`pnpm run migration:revert`，就行了
+
+## 25. nestjs websocket
+

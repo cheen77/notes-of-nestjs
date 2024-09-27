@@ -1,0 +1,86 @@
+/*--------------------
+  Body
+  --------------------*/
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: linear-gradient(135deg, #044f48, #2a7561);
+  background-size: cover;
+  font-family: "Open Sans", sans-serif;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+// 修改better-scroll样式
+.bscroll-vertical-scrollbar {
+  width: 3px !important;
+  .bscroll-indicator {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    border: unset !important;
+  }
+}
+
+.button {
+  --color: #00a97f;
+  padding: 0.8em 1.7em;
+  border-radius: 0.3em;
+  border: 1px solid var(--color);
+  background-color: transparent;
+  font-size: 17px;
+  font-weight: 400;
+  cursor: pointer;
+  text-transform: uppercase;
+  color: var(--color);
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  transition: 0.5s;
+}
+
+.button::before,
+.button::after {
+  content: "";
+  display: block;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  background-color: var(--color);
+  transition: 1s ease;
+}
+.button::before {
+  top: -1em; /* 1em = 17px */
+  left: -1em;
+}
+.button::after {
+  top: calc(100% + 1em);
+  left: calc(100% + 1em);
+}
+
+.button:hover::before,
+.button:hover::after {
+  width: 410px;
+  height: 410px;
+}
+
+.button:hover {
+  color: rgb(10, 25, 30);
+}
+
+.button:active {
+  filter: brightness(0.8);
+  transform: scale(0.9);
+}
