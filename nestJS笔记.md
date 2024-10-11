@@ -4129,5 +4129,464 @@ export const dataSourceOptions: DataSourceOptions = {
 
 如果我们想回滚，运行`pnpm run migration:revert`，就行了
 
-## 25. nestjs websocket
+## 25. nestjs 环境变量配置
 
+如果我们将一些配置项放到`env`当中，如何在`nestjs-cli`项目中读取 env 中的配置项，以及如何读取我们当前项目环境？
+
+我们演示如何在不同环境下读取端口配置项
+
+### 1.新建`env`三个文件
+
+.env
+
+```
+PORT=3000
+```
+
+.env.development
+
+```
+ PORT=3001
+```
+
+.env.production
+
+```
+ PORT=3002
+```
+
+### 2.在`main.ts`中读取配置文件
+
+外部定义的环境变量通过  `process.env global`  在` Node.js`  内部可见
+
+在 `Node.js` 应用程序中，通常使用 `.env` 文件，其中包含键值对，其中每个键代表一个特定的值，以代表每个环境。 在不同的环境中运行应用程序仅是交换正确的`.env` 文件的问题。
+
+在 `Nest` 中使用这种技术的一个好方法是创建一个 `ConfigModule` ，它暴露一个 `ConfigService` ，根据 `$NODE_ENV` 环境变量加载适当的 `.env` 文件。虽然您可以选择自己编写这样的模块，但为方便起见，Nest 提供了开箱即用的`@ nestjs/config`软件包。
+
+#### 1.安装所需的依赖项。
+
+```
+npm i --save @nestjs/config
+```
+
+#### 2.导入`ConfigModule`模块
+
+安装完成之后，我们需要导入 ConfigModule 模块。通常，我们在根模块 AppModule 中导入它，并使用.forRoot()静态方法导入它的配置。
+
+```
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [ConfigModule.forRoot()],
+})
+export class AppModule {}
+
+```
+
+#### 3.使用 ConfigService
+
+```
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const port = configService.get('PORT');
+  const logger = new Logger('Main (main.ts)');
+  await app.listen(3000);
+  logger.log(`Server running on port ${port} - - ${process.env.NODE_ENV}`);
+}
+bootstrap();
+
+```
+
+#### 4.自定义`ConfigModule`配置项
+
+默认情况下，程序在应用程序的根目录中查找.env 文件。 要为.env 文件指定另一个路径，请配置 forRoot()的配置对象 envFilePath 属性(可选)，如下所示：
+
+```
+ConfigModule.forRoot({
+  envFilePath: '.env',
+});
+```
+
+还可以像这样为.env 文件指定多个路径：
+
+```
+  ConfigModule.forRoot({
+      // 指定多个 env 文件时，第一个优先级最高
+      envFilePath: ['.env.local', `.env.${process.env.NODE_ENV}`, '.env'],
+    }),
+```
+
+如果在多个文件中发现同一个变量，则第一个变量优先。
+
+#### 5.禁止加载环境变量
+
+如果您不想加载.env 文件，而是想简单地从运行时环境访问环境变量（如 OS shell 导出，例如`export DATABASE_USER = test`），则将`options`对象的`ignoreEnvFile`属性设置为`true`，如下所示 ：
+
+```
+ConfigModule.forRoot({
+  ignoreEnvFile: true,
+});
+```
+
+#### 6.全局使用
+
+```
+ConfigModule.forRoot({
+  isGlobal: true,
+});
+```
+
+#### 7. 扩展变量
+
+`@nestjs/config`包支持环境变量扩展。使用这种技术，您可以创建嵌套的环境变量，其中一个变量在另一个变量的定义中引用。例如:
+
+```
+APP_URL=mywebsite.com
+SUPPORT_EMAIL=support@${APP_URL}
+```
+
+通过这种构造，变量`SUPPORT_EMAIL`解析为`support@mywebsite.com`。注意${…}语法来触发解析变量`APP_URL`在`SUPPORT_EMAIL`定义中的值。
+
+```
+ ConfigModule.forRoot({
+      // ...
+      expandVariables: true,
+    }),
+```
+
+### 3.如何读取当前环境
+
+设置 `NODE_ENV` 环境变量，然后通过`process.env.NODE_ENV` 来读取当前环境
+
+```json
+    "start": "NODE_ENV=development nest start",
+    "start:dev": "NODE_ENV=development nest start --watch",
+    "start:debug": "NODE_ENV=development nest start --debug --watch",
+    "start:prod": "NODE_ENV=production node dist/main",
+```
+
+但是只这样会报错，'NODE_ENV' 不是内部或外部命令，也不是可运行的程序
+
+是因为在 Windows 环境下，直接在命令行使用 `NODE_ENV=development` 的语法无法生效。Windows 不支持像类 Unix 系统那样直接在命令前设置环境变量。
+
+解决： **使用 cross-env 模块**
+
+1.安装 `cross-env`：
+
+```
+npm install cross-env --save-dev
+```
+
+2.在 `package.json` 的 `scripts` 中修改启动命令：
+
+```
+    "start": "cross-env NODE_ENV=development nest start",
+    "start:dev": "cross-env NODE_ENV=development nest start --watch",
+    "start:debug": "cross-env NODE_ENV=development nest start --debug --watch",
+    "start:prod": "cross-env NODE_ENV=production node dist/main",
+```
+
+这样以后启动后，就能通过`process.env.NODE_ENV` 来读取当前环境
+
+
+
+
+## 26. nestjs 日志
+
+`Nest` 附带一个默认的内部日志记录器实现，它在实例化过程中以及在一些不同的情况下使用，比如发生异常等等（例如系统记录）。这由 `@nestjs/common` 包中的 `Logger` 类实现。你可以全面控制如下的日志系统的行为：
+
+- 完全禁用日志
+- 指定日志系统详细水平（例如，展示错误，警告，调试信息等）
+- 覆盖默认日志记录器的时间戳（例如使用 ISO8601 标准作为日期格式）
+- 完全覆盖默认日志记录器
+- 通过扩展自定义默认日志记录器
+- 使用依赖注入来简化编写和测试你的应用
+
+你也可以使用内置日志记录器，或者创建你自己的应用来记录你自己应用水平的事件和消息。
+
+更多高级的日志功能，可以使用任何 `Node.js` 日志包，比如[Winston](https://github.com/winstonjs/winston)，来生成一个完全自定义的生产环境水平的日志系统。
+
+
+
+### 1.扩展内置的日志类
+
+很多实例操作需要创建自己的日志。你不必完全重新发明轮子。只需继承内置 `ConsoleLogger` 类以部分覆盖默认实现，并使用 `super` 将调用委托给父类。 
+
+以：`6-websocket`下的`auth_websocket`项目为例：
+
+#### 新建类
+
+`src`下新建一个`logger-1`文件夹，然后新建`logger.service.ts`和`logger.module.ts`文件
+
+`logger.service.ts`:
+
+```
+import { ConsoleLogger } from '@nestjs/common';
+
+export class MyLogger extends ConsoleLogger {
+    verbose(message: any, context?: string): void {
+        super.verbose.apply(this, [message, context])
+    }
+    debug(message: any, context?: string): void {
+        super.debug.apply(this, [message, context])
+    }
+    log(message: any, context?: string): void {
+        super.log.apply(this, [message, context])
+    }
+    warn(message: any, context?: string): void {
+        super.warn.apply(this, [message, context])
+    }
+    //stack 参数通常用于记录错误日志时的错误堆栈信息
+    error(message: any, stack?: string, context?: string): void {
+        super.error.apply(this, [message, stack, context])
+
+    }
+}
+```
+
+ #### 依赖注入
+
+创建一个 `LoggerModule` 如下所示，从该模块中提供 `MyLogger` 
+
+~~~~
+import { Module } from '@nestjs/common';
+import { MyLogger } from './logger.service';
+
+@Module({
+    providers: [MyLogger],
+    exports: [MyLogger],
+})
+export class LoggerModule { }
+
+~~~~
+
+通过这个结构，你现在可以提供你的`自定义logger`供`其他任何模块`使用 
+
+因为你的 `MyLogger` 类是模块的一部分，它也可以使用依赖注入（例如，注入一个 `ConfigService` ）。提供自定义记录器供使用还需要一个技术，即 Nest 的系统记录（例如，供 `bootstrapping` 和 `error handling` ）。
+
+由于应用实例化（ `NestFactory.create()` ）在任何模块上下文之外发生，它不能参与初始化时正常的依赖注入阶段。因此我们必须保证至少一个应用模块导入了 `LoggerModule` 来触发 Nest ，从而生成一个我们的 `MyLogger` 类的单例。
+
+我们可以在之后按照下列知道来告诉 Nest 使用同一个 `MyLogger` 实例。
+
+
+
+首先在`app.module.ts`中引入LoggerModule模块
+
+~~~~
+import { Module } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
+import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from './logger-1/logger.module';
+@Module({
+  imports: [
+    LoggerModule
+  ],
+  controllers: [],
+  providers: [],
+})
+export class AppModule { }
+
+~~~~
+
+然后在`main.ts`中使用
+
+```
+const app = await NestFactory.create(AppModule, {
+  bufferLogs: true,//确保所有的日志都会被放入缓冲区
+});
+app.useLogger(app.get(MyLogger));
+await app.listen(3000);
+```
+
+在上面的例子中，我们把 `bufferLogs` 设置为 `true` 以确保所有的日志都会被放入缓冲区直到一个自定义的日志记录器被接入（在上面的例子中是 `MyLogger` ）并且应用初始化成功或者失败。如果初始化失败，Nest 会回退到原始的 `ConsoleLogger` 以打印出错误信息。你也可以将 `autoFlushLogs` 设置为 `false` （默认为 `true` ）来手动刷新日志缓冲区（使用 `Logger#flush()` 方法）。 
+
+在这里我们在 `NestApplication` 实例中用了 `get()` 方法以获取 `MyLogger` 对象的单例。这个技术在根本上是个“注入”一个日志记录器的实例供 Nest 使用的方法。 `app.get()` 调用获取 `MyLogger` 单例，并且像之前所述的那样依赖于第一个注入到其他模块的实例。 
+
+### 2.使用`Winston`来自定义日志系统  
+
+如果我们想在`生产环境`定制化需求，比如记录中心，日志文件等日志需求，可能更倾向于使用类似[Winston](https://github.com/winstonjs/winston)的模块，这是一个标准的 Node.js 应用，你可以在 Nest 中体验到类似模块的优势。 
+
+那我们就接着上面的扩展，接入`winston`实现自定义日志系统。
+
+
+
+#### 1.引入包
+
+`winston` 是一个独立的、通用的日志库，适用于 Node.js 应用程序。它提供了强大的日志记录功能，支持多种传输方式（例如：文件、控制台、HTTP 等），并允许灵活地自定义日志级别、格式和输出。 
+
+`winston-daily-rotate-file` 用于通过` winston` 实现日志文件的按日期轮换，生成不同日期的日志文件。 
+
+~~~~
+pnpm install winston winston-daily-rotate-file
+~~~~
+
+
+
+#### 2.修改logger.service.ts文件
+
+~~~~
+import { ConsoleLogger, ConsoleLoggerOptions, Injectable } from '@nestjs/common'
+import { config, createLogger, format, transports } from 'winston';
+import 'winston-daily-rotate-file';
+import type { Logger as WinstonLogger } from 'winston';
+import { ConfigService } from '@nestjs/config'
+/**
+ * 在日志系统中的常见日志级别（从高到低）：
+  error: 记录错误信息，程序遇到无法继续的情况。
+  warn: 记录警告信息，程序可以继续执行，但可能存在潜在问题。
+  info: 记录常规信息，表明程序运行正常，输出重要状态或事件。
+  debug: 记录调试信息，输出一些供开发人员调试时使用的较详细信息。
+  verbose: 记录非常详细的调试信息，通常是所有日志级别中最详细的。
+ */
+export enum LogLevel {
+    ERROR = 'error',
+    WARN = 'warn',
+    INFO = 'info',
+    DEBUG = 'debug',
+    VERBOSE = 'verbose',
+}
+@Injectable()
+export class MyLogger extends ConsoleLogger {
+    private winstonLogger: WinstonLogger;
+
+
+    constructor(
+        context: string,
+        options: ConsoleLoggerOptions, //NestJS 框架会自动处理这些实例，只用这样写就行了
+    ) {
+        super(context, options);// 调用父类的构造函数,子类的构造函数中必须先调用父类的构造函数，以确保父类的属性和方法能够被正确初始化。
+        this.initWinston()
+    }
+
+
+    protected initWinston(): void {
+        this.winstonLogger = createLogger({
+            levels: config.npm.levels,//定义日志级别，采用Winston的npm级别配置error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5
+            format: format.combine(
+                format.errors({ stack: true }),//错误日志包含堆栈信息
+                format.timestamp(),//给日志加时间戳
+                format.json(),//json格式输出日志
+            ),
+            transports: [// 指定日志的输出方式
+                new transports.DailyRotateFile({
+                    level: 'silly',//当 level 是 silly silly 及以上的日志会被记录
+                    filename: 'logs/app.%DATE%.log', //日志文件路径，%DATE%是一个占位符
+                    datePattern: 'YYYY-MM-DD',//指定日期格式
+                    maxSize: '20m',//日志最大内存20mb，超出此旧日志自动删除
+                    format: format.combine(format.timestamp(), format.json()),//这个 DailyRotateFile 的格式再一次组合了时间戳和 JSON 输出，以确保每一条日志都带有时间信息并以 JSON 格式存储。
+                    auditFile: 'logs/.audit/app.json',//用于记录文件轮换的元数据。winston-daily-rotate-file 会使用 auditFile 来跟踪文件轮换情况，以保证日志文件的自动管理。
+                }),
+
+
+                // 单独把error的日志领出来
+                new transports.DailyRotateFile({
+                    level: LogLevel.ERROR,//只记录 error 级别的日志
+                    filename: 'logs/app-error.%DATE%.log',
+                    datePattern: 'YYYY-MM-DD',
+                    maxFiles: '20m',
+                    format: format.combine(format.timestamp(), format.json()),
+                    auditFile: 'logs/.audit/app-error.json',
+                })
+            ]
+        })
+    }
+
+
+    verbose(message: any, context?: string): void {
+        super.verbose.apply(this, [message, context])
+
+        this.winstonLogger.log(LogLevel.VERBOSE, message, { context })
+    }
+
+    debug(message: any, context?: string): void {
+        super.debug.apply(this, [message, context])
+
+        this.winstonLogger.log(LogLevel.DEBUG, message, { context })
+    }
+
+    log(message: any, context?: string): void {
+        super.log.apply(this, [message, context])
+
+        this.winstonLogger.log(LogLevel.INFO, message, { context })
+    }
+
+    warn(message: any, context?: string): void {
+        super.warn.apply(this, [message, context])
+
+        this.winstonLogger.log(LogLevel.WARN, message)
+    }
+
+    error(message: any, stack?: string, context?: string): void {
+        super.error.apply(this, [message, stack, context])
+
+        const hasStack = !!context
+        this.winstonLogger.log(LogLevel.ERROR, {
+            context: hasStack ? context : stack,
+            message: hasStack ? new Error(message) : message,
+        })
+    }
+}
+
+~~~~
+
+
+
+使用：
+
+~~~~
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+  OnGatewayInit,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+} from '@nestjs/websockets';
+import { AuthService } from './auth.service';
+import { CreateAuthDto } from './dto/create-auth.dto';
+import { UpdateAuthDto } from './dto/update-auth.dto';
+import { MyLogger } from 'src/logger-1/logger.service';
+
+@WebSocketGateway({
+  namespace: 'auth', //作用   http://localhost:3001/auth 访问
+})
+export class AuthGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  constructor(
+    private readonly authService: AuthService,
+    private readonly logger: MyLogger,
+
+  ) { }
+
+  afterInit() { }
+
+  handleConnection() {
+    this.logger.verbose('Client connected', 'WS');
+  }
+  handleDisconnect() { }
+
+
+  @SubscribeMessage('aaa')
+  async create(
+    @MessageBody() body: any,
+  ) {
+    return true
+  }
+}
+
+~~~~
+
+这样后可以注入`logger`依赖，然后实现`自定义logger`
+
+
+
+
+
+## 2x. nestjs websocket
