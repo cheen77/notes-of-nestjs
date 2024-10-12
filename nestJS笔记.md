@@ -4129,6 +4129,8 @@ export const dataSourceOptions: DataSourceOptions = {
 
 如果我们想回滚，运行`pnpm run migration:revert`，就行了
 
+
+
 ## 25. nestjs 环境变量配置
 
 如果我们将一些配置项放到`env`当中，如何在`nestjs-cli`项目中读取 env 中的配置项，以及如何读取我们当前项目环境？
@@ -4296,8 +4298,188 @@ npm install cross-env --save-dev
 
 
 
+## 26. nestjs 配置命名空间
 
-## 26. nestjs 日志
+`ConfigService是 `NestJS 的配置服务，用来获取配置信息 
+
+如果我们希望配置信息能够依据当前工作环境而定的话，我们可以结合`env`文件实现灵活配置
+
+
+
+比如如果我`开发环境`希望将端口放在3001 ，而`生产环境`希望将端口改成3002,这时候如何进行配置呢
+
+
+
+以：`6-websocket`下的`auth_websocket`项目为例：
+
+### 1.配置env
+
+
+
+`.env.development`
+
+```
+PORT=3001
+
+```
+
+`.env.production`
+
+```
+PORT=3002
+
+```
+
+
+
+### 2.配置config文件
+
+在`src`下新建一个`config`文件夹用于存放一些配置项,然后创建`app.config.ts`文件
+
+ 此外我们还需要借助`nestjs`中的`registerAs `函数去实现，`registerAs()`函数返回一个“带名称空间”的配置对象， 格式如下
+
+```
+import { registerAs } from '@nestjs/config'
+export default registerAs('app', () => ({
+  port: process.env.PORT,
+}));
+
+```
+
+一定记得在`app.modules.ts中`使用`forRoot()`的`load`方法载入命名空间的配置。
+
+`config`文件夹下新建一个`index.ts`专门导出配置，然后 `load: [...Object.values(config)]`避免写非常多配置
+
+~~~~
+import { Module } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
+import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from './logger-1/logger.module';
+import config from './config'
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      // 指定多个 env 文件时，第一个优先级最高
+      envFilePath: ['.env.local', `.env.${process.env.NODE_ENV}`, '.env'],
+      // 加载自定义配置方法文件或者自定义命名空间文件 ,文件可能多个，写一个文件专门导出配置
+      load: [...Object.values(config)],
+    }),
+    AuthModule,
+    LoggerModule
+  ],
+  controllers: [],
+  providers: [],
+})
+export class AppModule { }
+
+~~~~
+
+
+
+通过这样，我们就能够实现将`env`中 的内容形成我们的配置项。
+
+访问
+
+main.ts
+
+```
+import { ConfigService } from '@nestjs/config'
+async function bootstrap() {
+    const app = await NestFactory.create(AppModule, { bufferLogs: true });
+    const configService = app.get(ConfigService<any>)
+     const { port } = configService.get('app', { infer: true })//infer自动推断
+}
+bootstrap() 
+
+```
+
+这样我们就能够拿到`namespace`为`app`的值了
+
+
+
+**那么问题来了，我既然可以通过`process.env`在任意位置访问`env`,那为什么需要将这些配置项全部放入`ConfigService `进入这种key-value的形式进行访问呢**
+
+
+
+1. **集中管理和维护**
+
+使用 `ConfigService` 可以集中管理所有环境变量的访问和处理逻辑。通过 `registerAs()` 和 `ConfigService`，你将所有的环境配置放在一个地方，而不是在代码的不同地方直接调用 `process.env`。这样可以更方便地管理和维护环境变量。
+
+例如：
+
+```
+export default registerAs('app', () => ({
+  port: process.env.PORT,
+}));
+
+```
+
+这种方式让所有和应用相关的配置都集中在 `app` 配置下，以后只需要更新这里的配置，就能统一调整，而不用到处修改代码中硬编码的 `process.env.PORT`。
+
+1. **类型安全**
+
+`ConfigService` 可以和 TypeScript 类型结合，确保你在访问环境变量时有正确的类型提示和校验。直接使用 `process.env` 时，它的值默认是 `string | undefined`，你需要手动处理类型问题。而通过 `ConfigService`，你可以在定义时明确指定类型，这减少了出错的风险。
+
+例子：
+
+```
+const port = configService.get<number>('app.port');
+
+```
+
+如果你直接使用 `process.env.PORT`，还需要手动进行类型转换或验证是否为 `undefined`。而通过 `ConfigService`，这些问题可以被简化和自动处理。
+
+1. **环境隔离**
+
+通过 `ConfigService` 结合 `registerAs()`，你可以为不同的环境（开发、生产、测试）轻松设置不同的配置文件，并根据 `NODE_ENV` 动态加载不同的环境变量。使用 `process.env` 虽然也可以做到这一点，但管理起来会比较分散且难以追踪。
+
+1. **增强的测试能力**
+
+在测试环境中，使用 `ConfigService` 会让测试更加可控。你可以通过注入 `ConfigService`，很容易地为测试提供模拟的环境变量，而不需要依赖于全局的 `process.env`，这样不会影响其他模块的行为，避免潜在的测试污染。
+
+例如：
+
+```
+const mockConfigService = {
+  get: jest.fn().mockReturnValue(3000), // mock 返回值
+};
+
+```
+
+这样你可以在测试中模拟不同的环境配置。
+
+1. **依赖注入的好处**
+
+使用 `ConfigService` 的另一大优势是依赖注入机制。你可以在任何需要环境配置的地方通过 NestJS 的依赖注入机制来获取 `ConfigService`，这使得代码更具可维护性和模块化。
+
+例如：
+
+```
+@Injectable()
+export class AppService {
+  constructor(private configService: ConfigService) {}
+
+  getPort() {
+    return this.configService.get<number>('app.port');
+  }
+}
+
+```
+
+与直接使用 `process.env` 相比，这样的代码更可控、更容易测试，也符合 NestJS 的设计模式。
+
+1. **避免魔法字符串**
+
+直接使用 `process.env` 时，你需要在各个文件中不断重复使用环境变量名称，比如 `process.env.PORT`。如果不小心拼写错误，或者环境变量未定义，你可能会得到一个 `undefined` 值，从而导致潜在的 bug。通过 `ConfigService` 和 `registerAs()`，你可以在代码中使用统一的 key 进行访问，减少了出错的可能性。
+
+
+
+
+
+
+
+
+## 27. nestjs 日志
 
 `Nest` 附带一个默认的内部日志记录器实现，它在实例化过程中以及在一些不同的情况下使用，比如发生异常等等（例如系统记录）。这由 `@nestjs/common` 包中的 `Logger` 类实现。你可以全面控制如下的日志系统的行为：
 
@@ -4480,6 +4662,7 @@ export class MyLogger extends ConsoleLogger {
                     datePattern: 'YYYY-MM-DD',//指定日期格式
                     maxSize: '20m',//日志最大内存20mb，超出此旧日志自动删除
                     format: format.combine(format.timestamp(), format.json()),//这个 DailyRotateFile 的格式再一次组合了时间戳和 JSON 输出，以确保每一条日志都带有时间信息并以 JSON 格式存储。
+                    //日志文件还没有达到触发轮换的条件（比如文件大小没有达到 maxSize），则 app.json 不会生成
                     auditFile: 'logs/.audit/app.json',//用于记录文件轮换的元数据。winston-daily-rotate-file 会使用 auditFile 来跟踪文件轮换情况，以保证日志文件的自动管理。
                 }),
 
@@ -4491,6 +4674,7 @@ export class MyLogger extends ConsoleLogger {
                     datePattern: 'YYYY-MM-DD',
                     maxFiles: '20m',
                     format: format.combine(format.timestamp(), format.json()),
+                    //只要发生错误，日志就会写入。因此，日志轮换容易被触发。
                     auditFile: 'logs/.audit/app-error.json',
                 })
             ]
@@ -4584,6 +4768,54 @@ export class AuthGateway
 ~~~~
 
 这样后可以注入`logger`依赖，然后实现`自定义logger`
+
+
+
+`生产环境`可以通过配置docker.compose.yml配置
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

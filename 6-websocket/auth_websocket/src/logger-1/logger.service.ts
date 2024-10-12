@@ -3,6 +3,7 @@ import { config, createLogger, format, transports } from 'winston';
 import 'winston-daily-rotate-file';
 import type { Logger as WinstonLogger } from 'winston';
 import { ConfigService } from '@nestjs/config'
+
 /**
  * 在日志系统中的常见日志级别（从高到低）：
   error: 记录错误信息，程序遇到无法继续的情况。
@@ -47,6 +48,7 @@ export class MyLogger extends ConsoleLogger {
                     datePattern: 'YYYY-MM-DD',//指定日期格式
                     maxSize: '20m',//日志最大内存20mb，超出此旧日志自动删除
                     format: format.combine(format.timestamp(), format.json()),//这个 DailyRotateFile 的格式再一次组合了时间戳和 JSON 输出，以确保每一条日志都带有时间信息并以 JSON 格式存储。
+                    //日志文件还没有达到触发轮换的条件（比如文件大小没有达到 maxSize），则 app.json 不会生成
                     auditFile: 'logs/.audit/app.json',//用于记录文件轮换的元数据。winston-daily-rotate-file 会使用 auditFile 来跟踪文件轮换情况，以保证日志文件的自动管理。
                 }),
 
@@ -58,6 +60,7 @@ export class MyLogger extends ConsoleLogger {
                     datePattern: 'YYYY-MM-DD',
                     maxFiles: '20m',
                     format: format.combine(format.timestamp(), format.json()),
+                    //只要发生错误，日志就会写入。因此，日志轮换容易被触发。
                     auditFile: 'logs/.audit/app-error.json',
                 })
             ]

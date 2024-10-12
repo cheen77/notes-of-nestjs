@@ -3,13 +3,15 @@ import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MyLogger } from './logger-1/logger.service';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,//确保所有的日志都会被放入缓冲区
   });
 
   const configService = app.get(ConfigService);
-  const port = configService.get('PORT');
+  // const port = configService.get('PORT');
+  const { port } = configService.get('app');
   // const logger = new Logger('Main (main.ts)');
   await app.listen(port, '0.0.0.0', async () => {
 
